@@ -1,0 +1,1738 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>출장자 관리 시스템</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  :root{
+    --ink:#16202e;--soft:#5a6678;--line:#dde3ec;--line2:#eef2f7;--paper:#f6f4ee;--card:#fff;
+    --navy:#1f3a5f;--navy-s:#e6edf5;--stamp:#b4252a;--teal:#0f6e6e;
+    --warn:#c2410c;--warn-s:#fdebd9;--ok:#15803d;--ok-s:#e3f4e8;--over:#9f1239;--over-s:#fbe1e8;
+    --live:#0f6e6e;--live-s:#dcefee;--done:#64748b;--done-s:#eef1f5;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,"Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",sans-serif;
+    background:var(--paper);color:var(--ink);font-size:14px;line-height:1.5;-webkit-text-size-adjust:100%}
+  header{background:var(--navy);color:#fff;padding:16px 110px 14px 16px;position:relative;overflow:hidden}
+  @media(min-width:560px){ header{padding:16px 230px 14px 16px} }
+  header::after{content:"";position:absolute;right:-34px;top:-30px;width:140px;height:140px;border:3px solid rgba(255,255,255,.1);border-radius:50%}
+  header h1{font-size:17px;font-weight:800;letter-spacing:-.3px}
+  header .sub{font-size:11.5px;opacity:.82;margin-top:3px;font-variant-numeric:tabular-nums}
+  #lock-btn{position:absolute;right:14px;top:14px;z-index:3;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:20px;padding:6px 13px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}
+  #lock-btn.admin{background:#16c2c2;border-color:#16c2c2}
+  #report-btn{position:absolute;right:14px;top:50px;z-index:3;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:20px;padding:6px 13px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}
+  @media(min-width:560px){ #report-btn{right:120px;top:14px} }
+  /* 조회전용 모드: 편집요소 숨김 */
+  body.viewonly .admin-only{display:none!important}
+  .pii-mask{letter-spacing:1px}
+
+  nav{display:flex;background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20;overflow-x:auto}
+  nav button{flex:1 0 auto;min-width:64px;border:0;background:none;padding:12px 8px;font-size:12.5px;font-weight:600;
+    color:var(--soft);cursor:pointer;border-bottom:2.5px solid transparent;font-family:inherit;white-space:nowrap}
+  nav button.active{color:var(--navy);border-bottom-color:var(--stamp)}
+
+  main{padding:14px 16px 70px;max-width:1280px;margin:0 auto;width:100%}
+  @media(max-width:760px){ main{padding:14px 12px 70px} }
+  .view{display:none}.view.active{display:block}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+  .card h2{font-size:13px;font-weight:800;margin-bottom:12px;display:flex;align-items:center;gap:7px}
+  .card h2 .dot{width:8px;height:8px;border-radius:2px;background:var(--stamp);transform:rotate(45deg)}
+  .card h2 .cnt{margin-left:auto;font-size:11px;font-weight:600;color:var(--soft)}
+
+  label{display:block;font-size:11px;font-weight:700;color:var(--soft);margin:9px 0 4px;text-transform:uppercase;letter-spacing:.4px}
+  input,select,textarea{width:100%;padding:10px 11px;border:1px solid var(--line);border-radius:8px;font-size:14px;font-family:inherit;background:#fff;color:var(--ink)}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--navy);box-shadow:0 0 0 3px var(--navy-s)}
+  .row{display:flex;gap:9px}.row>*{flex:1}
+  .pick-row{display:flex;gap:7px;align-items:stretch}
+  .pick-row select{flex:1}
+  .newbtn{flex-shrink:0;border:1.5px solid var(--navy);background:var(--navy-s);color:var(--navy);border-radius:8px;padding:0 12px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap}
+  .newbtn:active{opacity:.8}
+  .newbtn.on{background:var(--navy);color:#fff}
+  .seg{display:flex;gap:6px}
+  .seg label{flex:1;margin:0;padding:9px;text-align:center;border:1px solid var(--line);border-radius:8px;cursor:pointer;font-size:13px;text-transform:none;letter-spacing:0;color:var(--soft);background:#fff}
+  .seg input{display:none}
+  .seg label:has(input:checked){border-color:var(--navy);background:var(--navy-s);color:var(--navy);font-weight:700}
+
+  button.primary{width:100%;margin-top:14px;padding:13px;background:var(--navy);color:#fff;border:0;border-radius:9px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit}
+  button.primary:active{opacity:.85}
+  button.ghost{background:#fff;color:var(--navy);border:1.5px solid var(--navy)}
+  button.danger{background:#fff;color:var(--stamp);border:1.5px solid var(--stamp)}
+
+  /* dashboard segmented */
+  .dash-seg{display:flex;gap:6px;margin-bottom:12px}
+  .dash-seg button{flex:1;padding:9px;border:1px solid var(--line);background:#fff;border-radius:8px;font-size:13px;font-weight:600;color:var(--soft);cursor:pointer;font-family:inherit}
+  .dash-seg button.on{background:linear-gradient(135deg,#2563eb,#0ea5e9);color:#fff;border-color:transparent;box-shadow:0 3px 10px rgba(37,99,235,.25)}
+
+  .kpis{display:flex;gap:9px;margin-bottom:16px}
+  .dash-section-title{font-size:12px;font-weight:800;color:var(--soft);text-transform:uppercase;letter-spacing:.5px;margin:0 0 8px 2px}
+  .kpi{flex:1;border-radius:13px;padding:13px 10px;text-align:center;color:#fff;position:relative;overflow:hidden;box-shadow:0 4px 14px rgba(30,50,90,.16)}
+  .kpi .ki{font-size:18px;line-height:1;margin-bottom:5px;position:relative;z-index:1}
+  /* 대시보드 2단 (PC) */
+  .dash-grid{display:block}
+  @media(min-width:900px){
+    .dash-grid{display:grid;grid-template-columns:1.35fr 1fr;gap:16px;align-items:start}
+    .dash-col-map #world-map{height:440px}
+    .dash-col-map{position:sticky;top:64px}
+  }
+  .kpi::after{content:"";position:absolute;right:-14px;top:-14px;width:56px;height:56px;border-radius:50%;background:rgba(255,255,255,.13)}
+  .kpi.live{background:linear-gradient(135deg,#14b8a6,#0ea5e9)}
+  .kpi.k-warn{background:linear-gradient(135deg,#ef4444,#f97316)}
+  .kpi.k-trip{background:linear-gradient(135deg,#f59e0b,#f97316)}
+  .kpi .n{font-size:27px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1;position:relative;z-index:1}
+  .kpi .l{font-size:10.5px;margin-top:4px;opacity:.92;position:relative;z-index:1;font-weight:600}
+
+  .grp{background:var(--card);border:1px solid var(--line);border-radius:11px;padding:12px;margin-bottom:9px;cursor:pointer;transition:.12s}
+  .grp:active{transform:scale(.99)}
+  .grp .gh{display:flex;align-items:center;justify-content:space-between}
+  .grp .gt{font-size:15px;font-weight:800}
+  .grp .gs{font-size:11px;color:var(--soft);margin-top:2px}
+  .grp .gn{display:flex;align-items:center;gap:6px;flex-shrink:0}
+  .pill{font-size:11px;font-weight:800;padding:3px 9px;border-radius:20px;background:var(--live-s);color:var(--live)}
+  .pill.zero{background:var(--done-s);color:var(--done)}
+  .chev{color:var(--soft);font-size:18px}
+
+  /* 막대그래프 */
+  .bars{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 12px 6px}
+  .bar-row{display:flex;align-items:center;gap:9px;padding:7px 0;cursor:pointer;border-radius:7px;transition:.1s}
+  .bar-row:active{background:var(--line2)}
+  .bar-label{width:96px;flex-shrink:0;font-size:12.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right;display:flex;align-items:center;gap:5px;justify-content:flex-end}
+  .bar-key{width:8px;height:8px;border-radius:2px;flex-shrink:0;display:inline-block}
+  .bar-track{flex:1;background:var(--line2);border-radius:6px;height:24px;position:relative;overflow:hidden}
+  .bar-fill{height:100%;border-radius:6px;background:linear-gradient(90deg,var(--navy),var(--teal));min-width:3px;transition:width .5s cubic-bezier(.2,.8,.2,1)}
+  .bar-fill.zero{background:var(--line)}
+  .bar-val{position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:12px;font-weight:800;color:#fff;font-variant-numeric:tabular-nums;text-shadow:0 1px 2px rgba(0,0,0,.25)}
+  .bar-val.out{right:auto;left:calc(var(--w,0%) + 6px);color:var(--ink);text-shadow:none}
+  .bar-row .bchev{color:var(--soft);font-size:16px;flex-shrink:0}
+  .bars-empty{text-align:center;color:var(--soft);padding:24px 10px;font-size:13px}
+  .bars-foot{font-size:11px;color:var(--soft);text-align:center;padding:8px 0 4px}
+  .dash-dd{margin-bottom:10px}
+  .dash-dd select{width:100%;padding:11px;font-size:14px;font-weight:600;border:1.5px solid var(--navy);border-radius:9px;background:var(--navy-s);color:var(--navy);font-family:inherit;cursor:pointer}
+
+  /* 세계지도 (Leaflet) */
+  .map-wrap{background:#0f1d2e;border-radius:14px;padding:14px 12px 10px;margin-bottom:12px;position:relative;overflow:hidden;box-shadow:0 6px 22px rgba(15,30,55,.22)}
+  .map-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px;position:relative;z-index:2}
+  .map-title{color:#fff;font-size:14px;font-weight:800;letter-spacing:-.2px}
+  .map-sub{color:rgba(255,255,255,.6);font-size:11px;font-variant-numeric:tabular-nums}
+  #world-map{position:relative;width:100%;height:300px;border-radius:10px;overflow:hidden;background:#aadaff}
+  .leaflet-container{background:#aadaff;font-family:inherit}
+  .map-fallback{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;color:#33506b;font-size:12px;padding:20px;z-index:5;background:#e8f1f8}
+  /* 핀 마커 */
+  .pin-wrap{background:none!important;border:none!important;overflow:visible!important}
+  .pin-mk{position:relative;width:14px;height:14px;overflow:visible}
+  .pin-mk .dot{width:14px;height:14px;border-radius:50%;background:var(--pc,#16c2c2);border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);position:absolute;top:0;left:0;z-index:2;box-sizing:border-box}
+  .pin-mk.idle .dot{background:#8aa0bb;box-shadow:none}
+  .pin-mk .ring{width:14px;height:14px;border-radius:50%;background:var(--pc,#16c2c2);opacity:.5;position:absolute;top:0;left:0;z-index:1;animation:mkpulse 2s ease-out infinite;pointer-events:none}
+  .pin-mk.idle .ring{display:none}
+  @keyframes mkpulse{0%{transform:scale(1);opacity:.55}100%{transform:scale(3.2);opacity:0}}
+  .pin-mk .tag{position:absolute;left:50%;bottom:20px;transform:translateX(-50%);background:rgba(8,18,30,.92);color:#fff;font-size:11px;font-weight:800;padding:2px 7px;border-radius:6px;white-space:nowrap;border:1px solid var(--pc,rgba(22,194,194,.4));pointer-events:none}
+  .pin-mk .tag b{color:var(--pc,#16c2c2);margin-left:3px}
+  .leaflet-popup-content-wrapper{background:#16273a;color:#fff;border-radius:10px}
+  .leaflet-popup-content{margin:10px 12px;font-size:13px}
+  .leaflet-popup-tip{background:#16273a}
+  .pop-cust{font-weight:800;font-size:15px;margin-bottom:2px}
+  .pop-meta{color:rgba(255,255,255,.65);font-size:11px}
+  .pop-go{color:#16c2c2;font-size:11px;font-weight:700;margin-top:5px;cursor:pointer}
+  .map-legend{display:flex;align-items:center;gap:14px;margin-top:8px;position:relative;z-index:2;flex-wrap:wrap}
+  .map-legend .lg{display:flex;align-items:center;gap:5px;color:rgba(255,255,255,.8);font-size:11px;font-weight:600}
+  .map-legend .lg-dot{width:9px;height:9px;border-radius:50%;display:inline-block}
+  .map-legend .lg-hint{color:rgba(255,255,255,.5);font-size:10px;margin-left:auto}
+
+  /* 출장기록 목록 */
+  .rec-controls{display:flex;gap:8px;margin-bottom:10px}
+  .rec-controls select{flex:1;padding:9px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;background:#fff;color:var(--ink)}
+  .rec{display:flex;align-items:center;gap:10px;padding:11px 8px;border-bottom:1px solid var(--line2)}
+  .rec:last-child{border-bottom:0}
+  .rec .rflag{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:11px;flex-shrink:0}
+  .rec .rinfo{flex:1;min-width:0}
+  .rec .r1{font-weight:700;font-size:13.5px;display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+  .rec .r2{font-size:11px;color:var(--soft);margin-top:2px;font-variant-numeric:tabular-nums}
+  .rec .rdays{font-weight:800;font-variant-numeric:tabular-nums;font-size:14px;flex-shrink:0;text-align:right}
+  .rec .rdays span{font-size:10px;color:var(--soft);font-weight:600}
+  .rec .redit{flex-shrink:0;border:0;background:none;color:var(--soft);font-size:16px;cursor:pointer;padding:4px 6px}
+  .rec-empty{text-align:center;color:var(--soft);padding:26px 10px;font-size:13px}
+
+  /* 보고서 */
+  .chk-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-top:4px}
+  @media(min-width:680px){ .chk-grid{grid-template-columns:repeat(3,1fr)} }
+  .chk-grid label{display:flex;align-items:center;gap:7px;margin:0;padding:9px 10px;border:1px solid var(--line);border-radius:8px;cursor:pointer;font-size:12.5px;text-transform:none;letter-spacing:0;color:var(--ink);font-weight:600;background:#fff}
+  .chk-grid label:has(input:checked){border-color:var(--navy);background:var(--navy-s);color:var(--navy)}
+  .chk-grid input{width:auto;margin:0}
+  .report{background:#fff;border:1px solid var(--line);border-radius:12px;padding:22px;margin-bottom:12px}
+  .rp-head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2.5px solid var(--navy);padding-bottom:14px;margin-bottom:16px}
+  .rp-title{font-size:20px;font-weight:800;color:var(--navy);letter-spacing:-.3px}
+  .rp-meta{font-size:11.5px;color:var(--soft);margin-top:4px;line-height:1.6}
+  .rp-logo{font-size:12px;font-weight:800;color:var(--navy);text-align:right;line-height:1.5}
+  .rp-summary{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+  .rp-sum{background:var(--navy-s);border-radius:8px;padding:8px 14px;font-size:12px;color:var(--navy);font-weight:700}
+  .rp-sum b{font-size:16px;margin-right:4px}
+  .rp-table{width:100%;border-collapse:collapse;font-size:12px}
+  .rp-table th{background:var(--navy);color:#fff;padding:8px 9px;text-align:left;font-weight:700;white-space:nowrap;font-size:11px}
+  .rp-table td{padding:7px 9px;border-bottom:1px solid var(--line2);white-space:nowrap}
+  .rp-table tr:nth-child(even) td{background:#fafbfc}
+  .rp-table .rp-over{color:var(--over);font-weight:800}
+  .rp-table .rp-warn{color:var(--warn);font-weight:800}
+  .rp-foot{margin-top:16px;font-size:10.5px;color:var(--soft);text-align:center;border-top:1px solid var(--line);padding-top:10px}
+  .rp-actions{display:flex;gap:9px;margin-bottom:12px}
+  .rp-actions button{flex:1;padding:12px;border-radius:9px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;border:0}
+  .rp-print{background:var(--navy);color:#fff}
+  .rp-back{background:#fff;color:var(--navy);border:1.5px solid var(--navy)!important}
+  .rp-empty{text-align:center;color:var(--soft);padding:30px;font-size:13px}
+  @media print{
+    body{background:#fff}
+    header,nav,.no-print,.rp-actions,#toast,#load{display:none!important}
+    main{max-width:100%;padding:0}
+    .view:not(.active){display:none}
+    .report{border:0;box-shadow:none;padding:0;margin:0}
+    .dash-col-map,#splash{display:none!important}
+    @page{size:A4;margin:14mm}
+  }
+
+  /* 스플래시 (로딩) */
+  #splash{position:fixed;inset:0;z-index:2000;background:radial-gradient(circle at 50% 40%,#1f3a5f,#0c1726 78%);display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity .6s ease,visibility .6s}
+  #splash.hide{opacity:0;visibility:hidden;pointer-events:none}
+  .splash-mark{animation:floaty 2.4s ease-in-out infinite}
+  .sp-ring{transform-origin:center;animation:spin 1.1s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+  .splash-title{color:#fff;font-size:19px;font-weight:800;margin-top:20px;opacity:0;animation:fadeUp .6s ease .25s forwards;letter-spacing:-.3px}
+  .splash-sub{color:rgba(255,255,255,.5);font-size:11px;letter-spacing:3px;text-transform:uppercase;margin-top:4px;opacity:0;animation:fadeUp .6s ease .45s forwards}
+  .splash-bar{width:120px;height:3px;border-radius:3px;background:rgba(255,255,255,.12);margin-top:22px;overflow:hidden;opacity:0;animation:fadeUp .6s ease .6s forwards}
+  .splash-bar span{display:block;height:100%;width:40%;border-radius:3px;background:#16c2c2;animation:slide 1.1s ease-in-out infinite}
+  @keyframes slide{0%{transform:translateX(-120%)}100%{transform:translateX(320%)}}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+  .stat{display:flex;align-items:center;justify-content:space-between;padding:11px;border-radius:10px;border:1px solid var(--line);margin-bottom:8px;background:#fff;cursor:pointer}
+  .stat .ctry{font-size:15px;font-weight:800}
+  .stat .det{font-size:11px;color:var(--soft);margin-top:2px}
+  .stat .big{text-align:right;flex-shrink:0;padding-left:10px}
+  .stat .big .n{font-size:21px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1}
+  .stat .big .u{font-size:10px;color:var(--soft)}
+  .stat.s-ok{border-left:4px solid var(--ok)}.stat.s-warn{border-left:4px solid var(--warn)}
+  .stat.s-over{border-left:4px solid var(--over)}.stat.s-none{border-left:4px solid var(--line)}
+  .badge{display:inline-block;font-size:10px;font-weight:800;padding:2px 7px;border-radius:20px;margin-left:6px}
+  .b-ok{background:var(--ok-s);color:var(--ok)}.b-warn{background:var(--warn-s);color:var(--warn)}
+  .b-over{background:var(--over-s);color:var(--over)}
+  .b-live{background:var(--live-s);color:var(--live)}.b-done{background:var(--done-s);color:var(--done)}
+
+  .trip{display:flex;align-items:center;gap:10px;padding:10px;border-bottom:1px solid var(--line2)}
+  .trip:last-child{border-bottom:0}
+  .trip .flag{width:38px;height:38px;border-radius:8px;background:var(--navy-s);color:var(--navy);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;flex-shrink:0}
+  .trip .info{flex:1;min-width:0}
+  .trip .t1{font-weight:700;font-size:14px}
+  .trip .t2{font-size:11px;color:var(--soft);font-variant-numeric:tabular-nums}
+  .trip .dnum{font-weight:800;font-variant-numeric:tabular-nums;font-size:15px;flex-shrink:0;text-align:right}
+  .trip .dnum span{font-size:10px;color:var(--soft);font-weight:600}
+  .trip .x{flex-shrink:0;border:0;background:none;color:var(--soft);font-size:17px;cursor:pointer;padding:4px 5px}
+
+  .ppinfo{background:var(--navy-s);border-radius:9px;padding:10px 12px;margin-bottom:10px;font-size:12px}
+  .ppinfo b{color:var(--navy)}
+  .ppinfo .pr{display:flex;justify-content:space-between;padding:2px 0}
+
+  /* 출장자 검색 */
+  #f-results{margin:6px 0}
+  .sres{display:flex;align-items:center;gap:10px;padding:10px;border:1px solid var(--line);border-radius:9px;margin-bottom:6px;cursor:pointer;background:#fff}
+  .sres:active{background:var(--navy-s)}
+  .sres .av{width:34px;height:34px;border-radius:8px;background:var(--navy-s);color:var(--navy);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex-shrink:0}
+  .sres .si{flex:1;min-width:0}
+  .sres .sn{font-weight:700;font-size:14px}
+  .sres .sd{font-size:11px;color:var(--soft);margin-top:1px}
+  .sres-empty{font-size:12px;color:var(--soft);padding:8px 2px}
+  .sel-chip{display:flex;align-items:center;gap:10px;padding:11px;border:1.5px solid var(--navy);border-radius:9px;background:var(--navy-s);margin:6px 0}
+  .sel-chip .av{width:36px;height:36px;border-radius:8px;background:var(--navy);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;flex-shrink:0}
+  .sel-chip .si{flex:1;min-width:0}
+  .sel-chip .sn{font-weight:800;font-size:15px}
+  .sel-chip .sd{font-size:11px;color:var(--soft);margin-top:1px}
+  .sel-chip .clr{border:0;background:none;color:var(--soft);font-size:20px;cursor:pointer;padding:2px 6px}
+
+  .empty{text-align:center;color:var(--soft);padding:28px 10px;font-size:13px}
+  .hint{font-size:11px;color:var(--soft);margin-top:4px;line-height:1.45}
+  .back{display:inline-flex;align-items:center;gap:5px;background:none;border:0;color:var(--navy);font-weight:700;font-size:13px;cursor:pointer;padding:4px 0;margin-bottom:8px;font-family:inherit}
+
+  .rule,.mrow{border:1px solid var(--line);border-radius:9px;padding:11px;margin-bottom:9px}
+  .mrow{display:flex;align-items:center;justify-content:space-between}
+  .mrow .mt{font-size:13px}.mrow .mt b{font-size:14px}
+  .rule .rh{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+  .rule .rg{display:flex;gap:8px}.rule .rg>div{flex:1}
+  .rule .memo{font-size:11px;color:var(--soft);margin-top:6px}
+
+  #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--ink);color:#fff;padding:11px 18px;border-radius:24px;font-size:13px;font-weight:600;transition:.25s;z-index:100;max-width:90%}
+  #toast.show{transform:translateX(-50%) translateY(0)}
+  #toast.err{background:var(--stamp)}
+  #load{position:fixed;inset:0;background:rgba(246,244,238,.85);display:flex;align-items:center;justify-content:center;z-index:90;font-weight:700;color:var(--navy)}
+  #load.hide{display:none}
+  .spin{width:18px;height:18px;border:2.5px solid var(--navy-s);border-top-color:var(--navy);border-radius:50%;animation:sp .7s linear infinite;margin-right:9px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+
+  .modal{position:fixed;inset:0;background:rgba(22,32,46,.5);z-index:80;display:none;align-items:flex-end;justify-content:center}
+  .modal.show{display:flex}
+  .modal .sheet{background:var(--card);width:100%;max-width:820px;border-radius:16px 16px 0 0;padding:18px 16px 24px;max-height:88vh;overflow:auto}
+  .modal h2{font-size:15px;font-weight:800;margin-bottom:6px}
+  .modal .desc{font-size:13px;color:var(--soft);margin-bottom:14px}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>출장자 관리 시스템</h1>
+  <div class="sub">비자 체류일 · 발권정보 · 현장 현황 · <span id="today">—</span></div>
+  <button id="lock-btn" onclick="toggleAdmin()">🔒 조회전용</button>
+  <button id="report-btn" onclick="openReport()">📄 보고서</button>
+</header>
+
+<nav>
+  <button class="active" data-v="dash">🗺️ 대시보드</button>
+  <button data-v="reg" class="admin-only">✈️ 출장등록</button>
+  <button data-v="records">📋 출장기록</button>
+  <button data-v="person">👤 출장자명부</button>
+  <button data-v="master" class="admin-only">📍 출장사이트</button>
+  <button data-v="rules" class="admin-only">📋 비자기준</button>
+</nav>
+
+<main>
+  <!-- 대시보드 -->
+  <section class="view active" id="v-dash">
+    <div class="dash-grid">
+      <div class="dash-col-map">
+        <div id="map-wrap" class="map-wrap">
+          <div class="map-head">
+            <div class="map-title">🌏 글로벌 출장 현황</div>
+            <div class="map-sub" id="map-sub">현재 출장중 출장사이트</div>
+          </div>
+          <div id="world-map"><div id="map-fallback" class="map-fallback" style="display:none"></div></div>
+          <div class="map-legend">
+            <span class="lg"><i class="lg-dot" style="background:#16c2c2"></i>출장중</span>
+            <span class="lg"><i class="lg-dot" style="background:#8aa0bb"></i>대기</span>
+            <span class="lg-hint">핀을 누르면 상세</span>
+          </div>
+        </div>
+      </div>
+      <div class="dash-col-side">
+        <div class="kpis">
+          <div class="kpi live"><div class="ki">✈️</div><div class="n" id="k-live">0</div><div class="l">현재 출장중</div></div>
+          <div class="kpi k-warn" onclick="goWarnings()" style="cursor:pointer"><div class="ki">⚠️</div><div class="n" id="k-warn">0</div><div class="l">비자 경고 인원 ›</div></div>
+          <div class="kpi k-trip"><div class="ki">🗂️</div><div class="n" id="k-trip">0</div><div class="l">총 출장건수</div></div>
+        </div>
+        <div class="dash-section-title">현황 보기</div>
+        <div class="dash-seg">
+          <button class="on" data-by="site">📍 사이트별</button>
+          <button data-by="country">🌐 국가별</button>
+          <button data-by="project">🔧 프로젝트별</button>
+        </div>
+        <div id="dash-body"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 스플래시 (로딩) -->
+  <div id="splash">
+    <div class="splash-mark">
+      <svg viewBox="0 0 64 64" width="58" height="58" fill="none">
+        <circle cx="32" cy="32" r="29" stroke="#16c2c2" stroke-width="2" opacity=".35"/>
+        <circle cx="32" cy="32" r="29" stroke="#16c2c2" stroke-width="2" stroke-linecap="round" stroke-dasharray="46 136" class="sp-ring"/>
+        <path d="M32 14 C40 22 40 34 32 50 C24 34 24 22 32 14 Z" fill="#16c2c2" opacity=".9"/>
+        <circle cx="32" cy="27" r="4.5" fill="#0f2438"/>
+      </svg>
+    </div>
+    <div class="splash-title">출장자 관리 시스템</div>
+    <div class="splash-sub">ETS Global Travel</div>
+    <div class="splash-bar"><span></span></div>
+  </div>
+
+  <!-- 출장 등록 -->
+  <section class="view" id="v-reg">
+    <div class="card">
+      <h2><span class="dot"></span>출장 등록</h2>
+      <label>출장자 검색</label>
+      <input id="f-search" placeholder="이름으로 검색 (예: 홍길동)" autocomplete="off">
+      <div id="f-results"></div>
+      <div id="f-selected"></div>
+      <input type="hidden" id="f-person">
+      <div class="hint">명부에 없으면 <b>출장자명부</b> 탭에서 먼저 등록하세요 (여권정보 자동 연결).</div>
+
+      <label>출장사이트</label>
+      <div class="pick-row">
+        <select id="f-site" onchange="onSiteChange()"><option value="">— 등록된 출장사이트 선택 —</option></select>
+        <button type="button" class="newbtn" onclick="fSiteNew()">+ 새로 작성</button>
+      </div>
+      <input id="f-site-new" style="display:none;margin-top:6px" placeholder="새 출장사이트명 (예: UC3)" oninput="onFSiteNewInput()">
+      <div class="hint">목록에 없으면 <b>+ 새로 작성</b>으로 바로 추가할 수 있어요.</div>
+      <label>프로젝트</label>
+      <div class="pick-row">
+        <select id="f-project"><option value="">— 프로젝트 선택 —</option></select>
+        <button type="button" class="newbtn" onclick="fProjNew()">+ 새로 작성</button>
+      </div>
+      <input id="f-project-new" style="display:none;margin-top:6px" placeholder="새 프로젝트명">
+      <div class="row">
+        <div><label>국가</label><input id="f-country" list="dl-country2" placeholder="사이트 선택 시 자동" style="background:var(--line2)" readonly></div>
+        <div><label>도시/지역</label><input id="f-city" list="dl-city2" placeholder="자동" style="background:var(--line2)" readonly></div>
+      </div>
+      <label>비자</label>
+      <select id="f-visa"><option value="">— 국가 선택 후 비자 선택 —</option></select>
+      <div class="hint">국가에 맞는 비자가 없으면 <b>비자기준</b> 탭에서 먼저 등록하세요.</div>
+
+      <div class="row">
+        <div><label>출국일</label><input type="date" id="f-depart"></div>
+        <div><label>귀국일</label><input type="date" id="f-return"></div>
+      </div>
+      <div class="hint" id="f-days">체류일: 출국일·귀국일 입력 시 자동 계산 (양끝 포함)</div>
+
+      <label>비고</label>
+      <input id="f-note" placeholder="비자 종류, 목적 등 (선택)">
+      <input type="hidden" id="f-person">
+      <button class="primary" onclick="submitTrip()">출장 등록</button>
+    </div>
+  </section>
+
+  <!-- 출장자 명부 -->
+  <section class="view" id="v-person">
+    <div class="card admin-only">
+      <h2><span class="dot"></span>출장자 등록 / 수정</h2>
+      <input type="hidden" id="p-id">
+      <label>이름(국문)</label><input id="p-name" placeholder="홍길동">
+      <label>소속 구분</label>
+      <div class="seg">
+        <label><input type="radio" name="paff" value="직원" checked>직원</label>
+        <label><input type="radio" name="paff" value="협력사">협력사</label>
+      </div>
+      <label>회사명 (협력사 시)</label><input id="p-company" placeholder="협력사명">
+      <label>핸드폰</label><input id="p-phone" type="tel" placeholder="010-1234-5678">
+      <label>여권번호</label><input id="p-passport" placeholder="M12345678" style="text-transform:uppercase">
+      <label>영문명 (여권상)</label><input id="p-eng" placeholder="HONG GILDONG" style="text-transform:uppercase">
+      <label>생년월일</label><input type="date" id="p-birth">
+      <button class="primary" onclick="submitPerson()">명부 저장</button>
+      <button class="primary ghost" style="margin-top:8px" onclick="clearPersonForm()">새로 입력</button>
+    </div>
+    <div class="card">
+      <h2><span class="dot"></span>등록된 출장자 <span class="cnt" id="person-cnt"></span></h2>
+      <input id="pl-search" placeholder="이름·회사·핸드폰으로 검색" autocomplete="off" style="margin-bottom:10px">
+      <div id="person-list"></div>
+    </div>
+  </section>
+
+  <!-- 출장사이트 관리 (출장사이트 > 프로젝트) -->
+  <section class="view" id="v-master">
+    <div class="card">
+      <h2><span class="dot"></span>출장사이트 추가</h2>
+      <div class="hint" style="margin-bottom:8px">출장사이트(UC1·LGES·MI 등)와 프로젝트를 등록합니다. <b>도시/지역</b>(애리조나·자카르타·브로츠와프 등)을 넣으면 지도에 정확히 표시됩니다.</div>
+      <label>출장사이트</label>
+      <div class="pick-row">
+        <select id="m-site-sel" onchange="onMSiteSel()"><option value="">— 기존 사이트 선택 —</option></select>
+        <button type="button" class="newbtn" onclick="mSiteNew()">+ 새로 작성</button>
+      </div>
+      <input id="m-site" style="display:none;margin-top:6px" placeholder="새 출장사이트명 (예: UC3)">
+      <label>프로젝트</label><input id="m-project" placeholder="프로젝트명 (선택)">
+      <div class="row">
+        <div><label>국가</label><input id="m-country" list="dl-country2" placeholder="미국 / 폴란드 …"></div>
+        <div><label>도시/지역</label><input id="m-city" list="dl-city2" placeholder="애리조나 / 자카르타"></div>
+      </div>
+      <datalist id="dl-country2"></datalist><datalist id="dl-city2"></datalist>
+      <button class="primary" onclick="submitMaster()">출장사이트 추가</button>
+    </div>
+    <div class="card">
+      <h2><span class="dot"></span>등록된 출장사이트 <span class="cnt" id="master-cnt"></span></h2>
+      <div id="master-list"></div>
+    </div>
+  </section>
+
+  <!-- 비자 기준 -->
+  <section class="view" id="v-rules">
+    <div class="card">
+      <h2><span class="dot"></span>비자 기준</h2>
+      <div class="hint" style="margin-bottom:10px">국가 + 비자종류별로 한도를 관리합니다. 출장 등록 시 여기 등록된 비자만 선택할 수 있습니다. 기준기간 내 누적 체류일이 경고일수에 가까워지면 색으로 표시됩니다.</div>
+      <div id="rules-body"></div>
+    </div>
+    <div class="card">
+      <h2><span class="dot"></span>비자 추가 / 수정</h2>
+      <div class="row">
+        <div><label>국가</label><input id="r-country" list="dl-rcountry" placeholder="미국 / 폴란드"></div>
+        <div><label>비자명</label><input id="r-visa" placeholder="ESTA / B1·B2 / 셰겐"></div>
+      </div>
+      <datalist id="dl-rcountry"></datalist>
+      <div class="row">
+        <div><label>기준기간(일)</label><input type="number" id="r-window" value="365"></div>
+        <div><label>경고(한도)일수</label><input type="number" id="r-warn" value="90"></div>
+      </div>
+      <label>메모</label><input id="r-memo" placeholder="비고 (예: 1회 최대 90일)">
+      <button class="primary" onclick="submitRule()">저장</button>
+    </div>
+  </section>
+
+  <!-- 보고서 -->
+  <section class="view" id="v-report">
+    <button class="back no-print" onclick="document.querySelector('[data-v=&quot;dash&quot;]').click()">‹ 대시보드로</button>
+    <div class="card no-print">
+      <h2><span class="dot"></span>출장자 보고서 생성</h2>
+      <label>기준</label>
+      <div class="seg">
+        <label><input type="radio" name="rpby" value="site" checked onchange="rpFillGroup()">출장사이트</label>
+        <label><input type="radio" name="rpby" value="country" onchange="rpFillGroup()">국가</label>
+        <label><input type="radio" name="rpby" value="project" onchange="rpFillGroup()">프로젝트</label>
+      </div>
+      <label>대상 선택</label>
+      <select id="rp-group"><option value="__ALL__">— 전체 —</option></select>
+
+      <label>상태</label>
+      <div class="seg">
+        <label><input type="radio" name="rpstat" value="all" checked>전체</label>
+        <label><input type="radio" name="rpstat" value="live">출장중</label>
+        <label><input type="radio" name="rpstat" value="done">완료</label>
+      </div>
+
+      <label>표시 항목</label>
+      <div class="chk-grid" id="rp-fields"></div>
+
+      <button class="primary" onclick="genReport()">📄 보고서 생성</button>
+    </div>
+    <div id="report-out"></div>
+  </section>
+
+  <!-- 전체 출장기록 -->
+  <section class="view" id="v-records">
+    <div class="card">
+      <h2><span class="dot"></span>전체 출장기록 <span class="cnt" id="rec-cnt"></span></h2>
+      <input id="rec-search" placeholder="이름·사이트·국가·프로젝트로 검색" autocomplete="off" style="margin-bottom:9px">
+      <div class="rec-controls">
+        <select id="rec-status" onchange="renderRecords()">
+          <option value="all">상태: 전체</option>
+          <option value="live">진행중만</option>
+          <option value="done">완료만</option>
+        </select>
+        <select id="rec-sort" onchange="renderRecords()">
+          <option value="depart_desc">출국일 최신순</option>
+          <option value="depart_asc">출국일 오래된순</option>
+          <option value="name">이름순</option>
+          <option value="return_asc">귀국일 빠른순</option>
+        </select>
+      </div>
+      <div id="records-list"></div>
+    </div>
+  </section>
+</main>
+
+<!-- 출장기록 수정 모달 -->
+<div class="modal" id="modal-trip"><div class="sheet">
+  <h2>출장 기록 수정</h2>
+  <input type="hidden" id="e-id"><input type="hidden" id="e-personId">
+  <label>출장자</label><input id="e-name" readonly style="background:var(--line2)">
+  <label>출장사이트</label>
+  <select id="e-site"><option value="">— 선택 —</option></select>
+  <label>프로젝트</label>
+  <select id="e-project"><option value="">— 선택 —</option></select>
+  <div class="row">
+    <div><label>국가</label><input id="e-country" readonly style="background:var(--line2)"></div>
+    <div><label>도시/지역</label><input id="e-city" readonly style="background:var(--line2)"></div>
+  </div>
+  <label>비자</label>
+  <select id="e-visa"><option value="">— 비자 선택 —</option></select>
+  <div class="row">
+    <div><label>출국일</label><input type="date" id="e-depart"></div>
+    <div><label>귀국일</label><input type="date" id="e-return"></div>
+  </div>
+  <label>상태</label>
+  <div class="seg">
+    <label><input type="radio" name="estatus" value="진행중">진행중</label>
+    <label><input type="radio" name="estatus" value="완료">완료</label>
+  </div>
+  <label>비고</label><input id="e-note">
+  <button class="primary" onclick="submitEdit()">수정 저장</button>
+  <button class="primary danger" style="margin-top:8px" onclick="delTrip()">이 출장 기록 삭제</button>
+  <button class="primary ghost" style="margin-top:8px" onclick="closeM('modal-trip')">취소</button>
+</div></div>
+
+<!-- 귀국 완료 확인 모달 -->
+<div class="modal" id="modal-return"><div class="sheet">
+  <h2>귀국 완료 처리</h2>
+  <div class="desc" id="ret-desc"></div>
+  <button class="primary" onclick="confirmReturn()">귀국 완료로 변경</button>
+  <button class="primary ghost" style="margin-top:8px" onclick="skipReturn()">아직 출장중 (나중에)</button>
+</div></div>
+
+<div class="modal" id="modal-admin"><div class="sheet">
+  <h2>🔒 관리자 모드</h2>
+  <div class="desc">관리번호를 입력하면 등록·수정·삭제 기능이 열리고 개인정보가 표시됩니다.</div>
+  <label>관리번호</label>
+  <input type="password" id="admin-pw" placeholder="관리번호 입력" onkeydown="if(event.key==='Enter')submitAdmin()">
+  <button class="primary" onclick="submitAdmin()">확인</button>
+  <button class="primary ghost" style="margin-top:8px" onclick="closeM('modal-admin')">취소</button>
+</div></div>
+
+<div id="toast"></div>
+<div id="load"><span class="spin"></span>불러오는 중…</div>
+
+<script>
+var DATA={trips:[],persons:[],master:[],rules:[],today:''};
+/* ===== 백엔드 연결 설정 =====
+   아래 API_URL에 Apps Script 웹앱 URL(.../exec)을 붙여넣으세요.
+   비워두면(빈 문자열) 로컬 미리보기 모드로 동작합니다(저장 안 됨). */
+var API_URL='https://script.google.com/macros/s/AKfycbzTeVgQL6Q3IFDbliXW_-HHqjqTTSueu9mYYHC4jmzu4WuDPfbAJ0utY02jEPlF9abQeA/exec';   // Apps Script 웹앱 URL
+var GAS=!!API_URL;
+
+/* ===== 관리자 모드 (사내 실수방지용 간단 잠금) ===== */
+var ADMIN_PW='ets2026';   // 관리번호 — 배포 시 원하는 번호로 변경
+var IS_ADMIN=false;
+function applyAdminUI(){
+  document.body.classList.toggle('viewonly', !IS_ADMIN);
+  var btn=document.getElementById('lock-btn');
+  if(btn){ btn.textContent=IS_ADMIN?'🔓 관리자':'🔒 조회전용'; btn.classList.toggle('admin',IS_ADMIN); }
+}
+function toggleAdmin(){
+  if(IS_ADMIN){
+    // 관리자 → 조회전용으로 잠그기
+    IS_ADMIN=false; applyAdminUI();
+    // 편집 탭에 있었다면 대시보드로
+    var active=document.querySelector('nav button.active');
+    if(active && active.classList.contains('admin-only')) document.querySelector('[data-v="dash"]').click();
+    if(typeof render==='function') render();
+    toast('조회전용 모드로 전환되었습니다');
+  }else{
+    document.getElementById('admin-pw').value='';
+    openM('modal-admin');
+    setTimeout(function(){document.getElementById('admin-pw').focus();},100);
+  }
+}
+function submitAdmin(){
+  if(val('admin-pw')===ADMIN_PW){
+    IS_ADMIN=true; applyAdminUI(); closeM('modal-admin');
+    if(typeof render==='function') render();
+    toast('관리자 모드로 전환되었습니다');
+  }else{
+    toast('관리번호가 올바르지 않습니다',true);
+  }
+}
+/* 개인정보 마스킹 — 조회전용일 때 가림 */
+function pii(value,type){
+  if(IS_ADMIN) return value||'';
+  if(!value) return '';
+  return '•••';
+}
+/* 보고서 화면 열기 (탭이 아닌 별도 버튼) */
+function openReport(){
+  document.querySelectorAll('nav button').forEach(function(x){x.classList.remove('active');});
+  document.querySelectorAll('.view').forEach(function(x){x.classList.remove('active');});
+  document.getElementById('v-report').classList.add('active');
+  rpInit();
+  window.scrollTo(0,0);
+}
+var DASH_BY='site', NAV={level:'list'};
+var retQueue=[], retIdx=0;
+
+/* 국가 중심 좌표 (위도, 경도) */
+var COUNTRY_COORD={
+  '미국':[39.5,-98.5],'USA':[39.5,-98.5],'United States':[39.5,-98.5],
+  '중국':[35.9,104.2],'China':[35.9,104.2],
+  '폴란드':[52.0,19.1],'Poland':[52.0,19.1],
+  '인도네시아':[-2.5,118.0],'Indonesia':[-2.5,118.0],
+  '캐나다':[56.1,-106.3],'Canada':[56.1,-106.3],
+  '한국':[36.5,127.8],'대한민국':[36.5,127.8],'Korea':[36.5,127.8],
+  '일본':[36.2,138.3],'Japan':[36.2,138.3],
+  '베트남':[14.1,108.3],'Vietnam':[14.1,108.3],
+  '인도':[22.6,79.0],'India':[22.6,79.0],
+  '독일':[51.2,10.4],'Germany':[51.2,10.4],
+  '멕시코':[23.6,-102.6],'Mexico':[23.6,-102.6],
+  '헝가리':[47.2,19.5],'Hungary':[47.2,19.5],
+  '체코':[49.8,15.5],'Czech':[49.8,15.5],
+  '말레이시아':[4.2,101.9],'Malaysia':[4.2,101.9],
+  '태국':[15.1,101.0],'Thailand':[15.1,101.0],
+  '브라질':[-10.3,-53.2],'Brazil':[-10.3,-53.2],
+  '호주':[-25.3,133.8],'Australia':[-25.3,133.8],
+  '영국':[54.0,-2.0],'UK':[54.0,-2.0],
+  '프랑스':[46.6,2.4],'France':[46.6,2.4],
+  '스페인':[40.0,-3.7],'Spain':[40.0,-3.7],
+  '터키':[39.0,35.2],'튀르키예':[39.0,35.2],'Turkey':[39.0,35.2],
+  '사우디':[24.0,45.0],'사우디아라비아':[24.0,45.0],'Saudi':[24.0,45.0],
+  'UAE':[24.0,54.0],'아랍에미리트':[24.0,54.0]
+};
+function coordFor(country){ if(!country) return null; var t=String(country).trim(); return COUNTRY_COORD[t]||null; }
+
+/* 주요 도시/지역 좌표 (위도, 경도) — 현장 위치 정밀 표시용 */
+var CITY_COORD={
+  // 미국
+  '애리조나':[34.0,-111.9],'arizona':[34.0,-111.9],'피닉스':[33.45,-112.07],'phoenix':[33.45,-112.07],
+  '텍사스':[31.0,-99.0],'texas':[31.0,-99.0],'휴스턴':[29.76,-95.37],'houston':[29.76,-95.37],
+  '댈러스':[32.78,-96.80],'dallas':[32.78,-96.80],'오스틴':[30.27,-97.74],'austin':[30.27,-97.74],
+  '캘리포니아':[36.78,-119.42],'california':[36.78,-119.42],'la':[34.05,-118.24],'로스앤젤레스':[34.05,-118.24],
+  '뉴욕':[40.71,-74.0],'new york':[40.71,-74.0],'시카고':[41.88,-87.63],'chicago':[41.88,-87.63],
+  '조지아':[32.9,-83.5],'georgia':[32.9,-83.5],'애틀랜타':[33.75,-84.39],'atlanta':[33.75,-84.39],
+  '미시간':[44.3,-85.6],'michigan':[44.3,-85.6],'오하이오':[40.4,-82.9],'ohio':[40.4,-82.9],
+  '테네시':[35.5,-86.6],'tennessee':[35.5,-86.6],'네바다':[38.8,-116.4],'nevada':[38.8,-116.4],
+  // 폴란드
+  '브로츠와프':[51.11,17.04],'wroclaw':[51.11,17.04],'바르샤바':[52.23,21.01],'warsaw':[52.23,21.01],
+  '크라쿠프':[50.06,19.94],'krakow':[50.06,19.94],'포즈난':[52.41,16.93],'poznan':[52.41,16.93],
+  // 인도네시아
+  '자카르타':[-6.21,106.85],'jakarta':[-6.21,106.85],'수라바야':[-7.25,112.75],'surabaya':[-7.25,112.75],
+  '바탕':[-6.90,109.73],'batang':[-6.90,109.73],'카라왕':[-6.30,107.30],'karawang':[-6.30,107.30],
+  // 중국
+  '상하이':[31.23,121.47],'shanghai':[31.23,121.47],'베이징':[39.90,116.40],'beijing':[39.90,116.40],
+  '난징':[32.06,118.80],'nanjing':[32.06,118.80],'우시':[31.49,120.31],'wuxi':[31.49,120.31],
+  '광저우':[23.13,113.26],'guangzhou':[23.13,113.26],'선전':[22.54,114.06],'shenzhen':[22.54,114.06],
+  // 캐나다
+  '토론토':[43.65,-79.38],'toronto':[43.65,-79.38],'밴쿠버':[49.28,-123.12],'vancouver':[49.28,-123.12],
+  '온타리오':[51.25,-85.32],'ontario':[51.25,-85.32],
+  // 헝가리/기타 유럽
+  '부다페스트':[47.50,19.04],'budapest':[47.50,19.04],'데브레첸':[47.53,21.63],'debrecen':[47.53,21.63],
+  '괴드':[47.69,19.13],'god':[47.69,19.13],
+  // 기타
+  '하노이':[21.03,105.85],'hanoi':[21.03,105.85],'호치민':[10.82,106.63],'호찌민':[10.82,106.63],'ho chi minh':[10.82,106.63],
+  '도쿄':[35.68,139.69],'tokyo':[35.68,139.69],'오사카':[34.69,135.50],'osaka':[34.69,135.50],
+  '뭄바이':[19.08,72.88],'mumbai':[19.08,72.88],'첸나이':[13.08,80.27],'chennai':[13.08,80.27],
+  '방콕':[13.76,100.50],'bangkok':[13.76,100.50],'몬테레이':[25.69,-100.32],'monterrey':[25.69,-100.32]
+};
+function cityCoord(name){
+  if(!name) return null;
+  var t=String(name).trim().toLowerCase();
+  if(!t) return null;
+  if(CITY_COORD[t]) return CITY_COORD[t];
+  // 부분 일치 (예: "애리조나 1공장" → 애리조나)
+  for(var k in CITY_COORD){ if(t.indexOf(k)>=0) return CITY_COORD[k]; }
+  return null;
+}
+/* 위치 결정: 직접좌표 > 도시 > 국가중심 */
+function resolveCoord(country, site){
+  var c=cityCoord(site);
+  if(c) return {coord:c, precise:true};
+  var cc=coordFor(country);
+  if(cc) return {coord:cc, precise:false};
+  return null;
+}
+
+/* 유틸 */
+function pd(s){ if(!s) return null; var p=String(s).split('-'); return new Date(+p[0],+p[1]-1,+p[2]); }
+function fmt(d){ if(!d) return ''; return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); }
+function incl(a,b){ if(!a||!b) return 0; return Math.floor((b-a)/86400000)+1; }
+function todayD(){ var t=pd(DATA.today)||new Date(); return new Date(t.getFullYear(),t.getMonth(),t.getDate()); }
+function dInWin(s,e,ws,td){ if(!s||!e) return 0; var a=s<ws?ws:s,b=e>td?td:e; if(a>b) return 0; return Math.floor((b-a)/86400000)+1; }
+function ruleFor(country,visa){
+  // 국가+비자 정확 매칭 우선
+  if(visa){ for(var i=0;i<DATA.rules.length;i++) if(DATA.rules[i].country===country&&DATA.rules[i].visa===visa) return DATA.rules[i]; }
+  // 비자 없거나 매칭 실패 시: 그 국가의 가장 엄격한(경고일수 작은) 기준으로 폴백
+  var cand=DATA.rules.filter(function(r){return r.country===country&&r.warn>0;});
+  if(cand.length){ cand.sort(function(a,b){return a.warn-b.warn;}); return cand[0]; }
+  var any=DATA.rules.filter(function(r){return r.country===country;})[0];
+  return any||{country:country,visa:visa||'',window:365,warn:0,memo:''};
+}
+/* 특정 국가의 비자 목록 */
+function visasForCountry(country){
+  return DATA.rules.filter(function(r){return r.country===country;}).map(function(r){return r.visa;}).filter(Boolean);
+}
+function cumDays(trips,win){ var td=todayD(),ws=new Date(td); ws.setDate(ws.getDate()-(win-1)); var s=0; trips.forEach(function(t){ s+=dInWin(pd(t.depart),pd(t.return),ws,td); }); return s; }
+function statusOf(cum,r){ if(!r.warn) return 'none'; if(cum>=r.warn) return 'over'; if(cum>=r.warn*0.8) return 'warn'; return 'ok'; }
+/* 비자 경고(임박/초과) 인원 수 — 사람×국가 중 하나라도 warn/over면 카운트 */
+function visaWarnings(){
+  // 사람×국가×비자 누적이 임박/초과인 항목 목록
+  var byKey={};
+  DATA.trips.forEach(function(t){
+    if(!t.name||!t.country) return;
+    var visa=t.visa||'';
+    var key=t.name+'||'+t.country+'||'+visa;
+    (byKey[key]=byKey[key]||{name:t.name,country:t.country,visa:visa,trips:[]}).trips.push(t);
+  });
+  var items=[];
+  Object.keys(byKey).forEach(function(key){
+    var o=byKey[key], r=ruleFor(o.country,o.visa);
+    if(!r.warn) return;
+    var cum=cumDays(o.trips,r.window), st=statusOf(cum,r);
+    if(st==='warn'||st==='over'){
+      items.push({name:o.name,country:o.country,visa:o.visa,cum:cum,warn:r.warn,window:r.window,status:st,over:cum-r.warn});
+    }
+  });
+  items.sort(function(a,b){ return (a.status==='over'?0:1)-(b.status==='over'?0:1) || b.cum-a.cum; });
+  return items;
+}
+function countVisaWarnings(){
+  var flagged={};
+  visaWarnings().forEach(function(it){ flagged[it.name]=1; });
+  return Object.keys(flagged).length;
+}
+function isLive(t){ return t.status!=='완료'; }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+function uniq(a){ return a.filter(function(v,i){return v&&a.indexOf(v)===i;}); }
+function val(id){ return document.getElementById(id).value; }
+function radio(n){ var r=document.querySelector('[name='+n+']:checked'); return r?r.value:''; }
+function flagTxt(c){ return (c||'?').slice(0,2); }
+
+/* 로드 */
+function load(){
+  if(!GAS){ mockData(); afterLoad(); return; }
+  apiCall('getAll',null,function(res){
+    DATA=res; afterLoad();
+  },function(msg){
+    toast(msg||'로드 실패',true); document.getElementById('load').classList.add('hide');
+  });
+}
+function afterLoad(){
+  document.getElementById('load').classList.add('hide'); render(); checkReturns();
+  // Leaflet이 늦게 로드되면 한 번 더 지도 렌더
+  if(typeof L==='undefined'){
+    var tries=0, iv=setInterval(function(){
+      tries++;
+      if(typeof L!=='undefined'){ clearInterval(iv); renderMap(); }
+      else if(tries>20){ clearInterval(iv); showMapFallback(); }
+    },200);
+  }
+}
+
+function render(){
+  document.getElementById('today').textContent='오늘 '+DATA.today;
+  fillDatalists(); fillPersonSelect();
+  renderMap(); renderDash(); renderPersonList(); renderMasterList(); renderRules();
+  if(document.getElementById('v-records').classList.contains('active')) renderRecords();
+}
+
+/* ===== Leaflet 세계지도 ===== */
+var LMAP=null, LMARKERS=[];
+function initLeaflet(){
+  if(LMAP || typeof L==='undefined') return;
+  var el=document.getElementById('world-map');
+  try{
+    LMAP=L.map(el,{ zoomControl:true, attributionControl:false, worldCopyJump:true, minZoom:1, maxZoom:8 })
+      .setView([25,30],1.4);
+    // CARTO Voyager 타일 (밝고 컬러풀, 국경·대륙 선명)
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{
+      subdomains:'abcd', maxZoom:19
+    }).addTo(LMAP);
+    L.control.attribution({prefix:false}).addAttribution('© OpenStreetMap, © CARTO').addTo(LMAP);
+  }catch(e){ showMapFallback(); }
+}
+function showMapFallback(){
+  var fb=document.getElementById('map-fallback');
+  if(fb){ fb.style.display='flex'; fb.innerHTML='지도를 불러올 수 없습니다.<br>인터넷 연결을 확인하세요.<br><span style="opacity:.6">(아래 출장사이트별 현황은 정상 동작합니다)</span>'; }
+}
+
+function renderMap(){
+  initLeaflet();
+  if(!LMAP){ showMapFallback(); updateMapSub(); return; }
+  // 기존 마커 제거
+  LMARKERS.forEach(function(m){ LMAP.removeLayer(m); });
+  LMARKERS=[];
+  var placed=computePins();
+  if(!placed.length){ updateMapSub(0,0); return; }
+  // 같은 좌표(국가중심 폴백)끼리만 분산
+  var byKey={};
+  placed.forEach(function(p){ var key=p.precise?('c'+p.cust):(p.coord[0]+','+p.coord[1]); (byKey[key]=byKey[key]||[]).push(p); });
+  Object.keys(byKey).forEach(function(key){
+    var arr=byKey[key], n=arr.length;
+    arr.forEach(function(p,i){
+      var lat=p.coord[0], lon=p.coord[1];
+      if(n>1 && !p.precise){ var ang=(i/n)*Math.PI*2; lat+=Math.sin(ang)*2.6; lon+=Math.cos(ang)*3.0; }
+      var live=p.live>0;
+      var color=custColor(p.cust);
+      var html='<div class="pin-mk'+(live?'':' idle')+'" style="--pc:'+color+'">'+
+        (live?'<div class="ring"></div>':'')+'<div class="dot"></div>'+
+        '<div class="tag">'+esc(p.cust)+(live?'<b>'+p.live+'</b>':'')+'</div></div>';
+      var icon=L.divIcon({ className:'pin-wrap', html:html, iconSize:[14,14], iconAnchor:[7,7], popupAnchor:[0,-10] });
+      var mk=L.marker([lat,lon],{icon:icon,riseOnHover:true}).addTo(LMAP);
+      var locTxt=(p.city?esc(p.city)+', ':'')+esc(p.country||'')+(p.precise?'':' <span style="opacity:.5">(국가 중심)</span>');
+      var pop='<div class="pop-cust" style="color:'+color+'">'+esc(p.cust)+'</div>'+
+        '<div class="pop-meta">'+locTxt+'<br>출장중 '+p.live+'명 · 총 '+p.total+'건</div>'+
+        '<div class="pop-go" data-cust="'+esc(p.cust)+'">상세 보기 ›</div>';
+      mk.bindPopup(pop,{closeButton:true,autoPan:true});
+      mk.on('popupopen',function(e){
+        try{
+          var el=e.popup.getElement();
+          var btn=el?el.querySelector('.pop-go'):null;
+          if(btn) btn.onclick=function(){ var c=btn.getAttribute('data-cust'); LMAP.closePopup(); mapGoto(c); };
+        }catch(err){}
+      });
+      LMARKERS.push(mk);
+    });
+  });
+  // 핀 범위로 맞춤
+  if(LMARKERS.length){
+    try{ var grp=L.featureGroup(LMARKERS); LMAP.fitBounds(grp.getBounds().pad(0.35),{maxZoom:4}); }catch(e){}
+  }
+  setTimeout(function(){ if(LMAP) LMAP.invalidateSize(); },150);
+  updateMapSub(placed.length, placed.reduce(function(s,p){return s+p.live;},0));
+}
+function mapGoto(cust){
+  // 사이트별 보기로 전환 (버튼 click을 쓰면 NAV가 초기화되므로 직접 처리)
+  DASH_BY='site';
+  document.querySelectorAll('.dash-seg button').forEach(function(x){ x.classList.toggle('on', x.dataset.by==='site'); });
+  goGroup('site',cust);
+}
+
+/* 생기있는 컬러 팔레트 — 고객사/그룹별 일관 색상 */
+var PALETTE=['#2563eb','#0ea5e9','#14b8a6','#10b981','#f59e0b','#f97316','#ef4444','#ec4899','#8b5cf6','#6366f1','#06b6d4','#84cc16'];
+var _colorCache={};
+function hashColor(str){
+  if(_colorCache[str]!=null) return _colorCache[str];
+  var h=0; str=String(str);
+  for(var i=0;i<str.length;i++){ h=(h*31+str.charCodeAt(i))>>>0; }
+  var c=PALETTE[h%PALETTE.length];
+  _colorCache[str]=c; return c;
+}
+function custColor(c){ return hashColor('cust:'+c); }
+function groupColor(by,k){ return hashColor(by+':'+k); }
+
+function computePins(){
+  var bySite={};
+  function ensure(k){ if(!bySite[k]) bySite[k]={live:0,total:0,country:'',city:'',names:{}}; return bySite[k]; }
+  DATA.trips.forEach(function(t){
+    var k=t.site||'(미지정)', g=ensure(k);
+    g.total++;
+    if(!g.country && t.country) g.country=t.country;
+    if(!g.city && t.city) g.city=t.city;
+    if(isLive(t)){ g.live++; g.names[t.name]=1; }
+  });
+  DATA.master.forEach(function(m){
+    if(!m.site) return;
+    var g=ensure(m.site);
+    if(m.country) g.country=m.country;  // 마스터 우선
+    if(m.city) g.city=m.city;
+  });
+  var placed=[];
+  Object.keys(bySite).forEach(function(site){
+    var g=bySite[site];
+    var rc=resolveCoord(g.country,g.city);
+    if(!rc) return;
+    placed.push({cust:site,country:g.country,city:g.city,
+      live:g.live,total:g.total,people:Object.keys(g.names).length,
+      coord:rc.coord,precise:rc.precise});
+  });
+  return placed;
+}
+function updateMapSub(n,live){
+  var sub=document.getElementById('map-sub');
+  if(n===undefined){ var p=computePins(); n=p.length; live=p.reduce(function(s,x){return s+x.live;},0); }
+  sub.textContent = n? ('출장사이트 '+n+'곳 · 출장중 '+live+'명') : '등록된 출장사이트가 없습니다';
+}
+
+/* datalist */
+function fillDatalists(){
+  var ctry=uniq(DATA.rules.map(function(r){return r.country;}).concat(DATA.master.map(function(m){return m.country;})).concat(DATA.trips.map(function(t){return t.country;}))).sort();
+  var city=uniq(DATA.master.map(function(m){return m.city;}).concat(DATA.trips.map(function(t){return t.city;}))).sort();
+  opt('dl-country2',ctry); opt('dl-city2',city);
+  fillSiteSelect();
+}
+function opt(id,arr){ var e=document.getElementById(id); if(e) e.innerHTML=arr.map(function(v){return '<option value="'+esc(v)+'">';}).join(''); }
+
+/* 등록된 출장사이트 목록 (마스터 + 기존 기록) */
+function allSites(){
+  return uniq(DATA.master.map(function(m){return m.site;}).concat(DATA.trips.map(function(t){return t.site;}))).filter(Boolean).sort();
+}
+/* 사이트 → {country, city} 추론 (마스터 우선, 없으면 기록) */
+function siteInfo(site){
+  var m=DATA.master.filter(function(x){return x.site===site;})[0];
+  if(m) return {country:m.country||'', city:m.city||''};
+  var t=DATA.trips.filter(function(x){return x.site===site;})[0];
+  if(t) return {country:t.country||'', city:t.city||''};
+  return {country:'',city:''};
+}
+/* 사이트의 프로젝트 목록 */
+function siteProjects(site){
+  return uniq(DATA.master.filter(function(m){return m.site===site;}).map(function(m){return m.project;})
+    .concat(DATA.trips.filter(function(t){return t.site===site;}).map(function(t){return t.project;}))).filter(Boolean).sort();
+}
+function fillSiteSelect(){
+  var sites=allSites();
+  ['f-site','e-site','m-site-sel'].forEach(function(id){
+    var s=document.getElementById(id); if(!s) return;
+    var cur=s.value;
+    var ph=(id==='m-site-sel')?'— 기존 사이트 선택 —':'— 등록된 출장사이트 선택 —';
+    s.innerHTML='<option value="">'+ph+'</option>'+sites.map(function(x){
+      return '<option'+(x===cur?' selected':'')+'>'+esc(x)+'</option>';
+    }).join('');
+  });
+}
+function fillProjectSelect(selId,site,cur){
+  var s=document.getElementById(selId); if(!s) return;
+  var projs=siteProjects(site);
+  s.innerHTML='<option value="">— 프로젝트 선택 —</option>'+projs.map(function(x){
+    return '<option'+(x===cur?' selected':'')+'>'+esc(x)+'</option>';
+  }).join('');
+}
+/* 출장등록: 사이트 선택 시 국가/도시 자동 + 프로젝트 연동 */
+var F_SITE_NEW=false, F_PROJ_NEW=false;
+function onSiteChange(){
+  var site=val('f-site'), info=siteInfo(site);
+  document.getElementById('f-country').value=info.country;
+  document.getElementById('f-city').value=info.city;
+  fillProjectSelect('f-project',site,'');
+  fillVisaSelect('f-visa',info.country,'');
+  // 선택 모드로 복귀
+  if(F_SITE_NEW){ fSiteNew(true); }
+}
+/* 비자 드롭다운 채우기 */
+function fillVisaSelect(selId,country,cur){
+  var s=document.getElementById(selId); if(!s) return;
+  var visas=visasForCountry(country);
+  if(!country){ s.innerHTML='<option value="">— 국가 선택 후 비자 선택 —</option>'; return; }
+  if(!visas.length){ s.innerHTML='<option value="">(이 국가에 등록된 비자 없음)</option>'; return; }
+  s.innerHTML='<option value="">— 비자 선택 —</option>'+visas.map(function(v){
+    return '<option'+(v===cur?' selected':'')+'>'+esc(v)+'</option>';
+  }).join('');
+}
+/* 출장등록: 사이트 새로 작성 토글 */
+function fSiteNew(forceOff){
+  F_SITE_NEW=forceOff?false:!F_SITE_NEW;
+  var inp=document.getElementById('f-site-new'), sel=document.getElementById('f-site');
+  var co=document.getElementById('f-country'), ci=document.getElementById('f-city');
+  var btn=document.querySelector('#v-reg .pick-row .newbtn');
+  if(F_SITE_NEW){
+    inp.style.display=''; inp.value=''; inp.focus(); sel.value=''; sel.disabled=true;
+    co.removeAttribute('readonly'); co.style.background='#fff'; co.value='';
+    ci.removeAttribute('readonly'); ci.style.background='#fff'; ci.value='';
+    fillProjectSelect('f-project','','');
+    fillVisaSelect('f-visa','','');
+    if(btn) btn.classList.add('on');
+  }else{
+    inp.style.display='none'; inp.value=''; sel.disabled=false;
+    co.setAttribute('readonly','readonly'); co.style.background='var(--line2)';
+    ci.setAttribute('readonly','readonly'); ci.style.background='var(--line2)';
+    if(btn) btn.classList.remove('on');
+  }
+}
+function onFCountryInput(){ /* 새 사이트 모드: 국가 입력 시 비자 목록 갱신 */ fillVisaSelect('f-visa',val('f-country').trim(),''); }
+function onFSiteNewInput(){ /* 새 사이트명 입력 시 국가/도시·비자는 사용자가 직접 입력/선택 */ }
+/* 출장등록: 프로젝트 새로 작성 토글 */
+function fProjNew(forceOff){
+  F_PROJ_NEW=forceOff?false:!F_PROJ_NEW;
+  var inp=document.getElementById('f-project-new'), sel=document.getElementById('f-project');
+  var btn=document.querySelectorAll('#v-reg .pick-row .newbtn')[1];
+  if(F_PROJ_NEW){ inp.style.display=''; inp.value=''; inp.focus(); sel.value=''; sel.disabled=true; if(btn) btn.classList.add('on'); }
+  else{ inp.style.display='none'; inp.value=''; sel.disabled=false; if(btn) btn.classList.remove('on'); }
+}
+
+/* 출장사이트 탭: 기존 선택 / 새로 작성 */
+var M_SITE_NEW=false;
+function onMSiteSel(){
+  var site=val('m-site-sel'); if(!site) return;
+  var info=siteInfo(site);
+  document.getElementById('m-country').value=info.country;
+  document.getElementById('m-city').value=info.city;
+  // 기존 사이트 선택 시 새 입력칸 숨김
+  if(M_SITE_NEW) mSiteNew(true);
+}
+function mSiteNew(forceOff){
+  M_SITE_NEW=forceOff?false:!M_SITE_NEW;
+  var inp=document.getElementById('m-site'), sel=document.getElementById('m-site-sel');
+  var btn=document.querySelector('#v-master .pick-row .newbtn');
+  if(M_SITE_NEW){
+    inp.style.display=''; inp.value=''; inp.focus(); sel.value=''; sel.disabled=true;
+    document.getElementById('m-country').value=''; document.getElementById('m-city').value='';
+    if(btn) btn.classList.add('on');
+  }else{
+    inp.style.display='none'; inp.value=''; sel.disabled=false;
+    if(btn) btn.classList.remove('on');
+  }
+}
+
+function fillPersonSelect(){
+  // 검색형으로 전환: 선택 칩이 없으면 결과 영역 초기화
+  if(!val('f-person')){ document.getElementById('f-selected').innerHTML=''; }
+  searchPersons();
+}
+
+function searchPersons(){
+  if(val('f-person')) return; // 이미 선택됨
+  var q=val('f-search').trim().toLowerCase();
+  var box=document.getElementById('f-results');
+  if(!q){ box.innerHTML=''; return; }
+  var hits=DATA.persons.filter(function(p){
+    return p.name.toLowerCase().indexOf(q)>=0
+      || (p.engName&&p.engName.toLowerCase().indexOf(q)>=0)
+      || (p.company&&p.company.toLowerCase().indexOf(q)>=0)
+      || (p.phone&&p.phone.indexOf(q)>=0);
+  }).slice(0,8);
+  if(!hits.length){ box.innerHTML='<div class="sres-empty">검색 결과 없음 · <b>출장자명부</b> 탭에서 등록하세요</div>'; return; }
+  box.innerHTML=hits.map(function(p){
+    var det=[p.affiliation,p.company,p.phone,p.birth].filter(Boolean).join(' · ');
+    return '<div class="sres" onclick=\'pickPerson("'+p.id+'")\'>'+
+      '<div class="av">'+esc(p.name.slice(0,1))+'</div>'+
+      '<div class="si"><div class="sn">'+esc(p.name)+'</div><div class="sd">'+esc(det||'정보 미등록')+'</div></div></div>';
+  }).join('');
+}
+function pickPerson(id){
+  var p=DATA.persons.filter(function(x){return x.id===id;})[0]; if(!p) return;
+  document.getElementById('f-person').value=id;
+  document.getElementById('f-results').innerHTML='';
+  document.getElementById('f-search').value='';
+  document.getElementById('f-search').style.display='none';
+  var det=[p.affiliation,p.company,p.phone].filter(Boolean).join(' · ');
+  document.getElementById('f-selected').innerHTML=
+    '<div class="sel-chip"><div class="av">'+esc(p.name.slice(0,1))+'</div>'+
+    '<div class="si"><div class="sn">'+esc(p.name)+'</div><div class="sd">'+esc(det||'정보 미등록')+
+    (p.passport?' · 여권 '+esc(p.passport):' · 여권미등록')+'</div></div>'+
+    '<button class="clr" onclick="clearPicked()">×</button></div>';
+}
+function clearPicked(){
+  document.getElementById('f-person').value='';
+  document.getElementById('f-selected').innerHTML='';
+  var s=document.getElementById('f-search'); s.style.display=''; s.value=''; s.focus();
+}
+
+/* ===== 대시보드 ===== */
+function renderDash(){
+  document.getElementById('k-live').textContent=DATA.trips.filter(isLive).length;
+  document.getElementById('k-warn').textContent=countVisaWarnings();
+  document.getElementById('k-trip').textContent=DATA.trips.length;
+  var mapCol=document.querySelector('.dash-col-map');
+  var grid=document.querySelector('.dash-grid');
+  var detail=(NAV.level==='person'||NAV.level==='group'||NAV.level==='warnings');
+  if(mapCol) mapCol.style.display=detail?'none':'';
+  if(grid) grid.style.gridTemplateColumns=detail?'1fr':'';
+  if(!detail && LMAP) setTimeout(function(){LMAP.invalidateSize();},100);
+  if(NAV.level==='person'){ renderPersonDetail(NAV.personName); return; }
+  if(NAV.level==='warnings'){ renderWarnings(); return; }
+  if(NAV.level==='group'){ renderGroupDetail(NAV.by,NAV.key); return; }
+  var box=document.getElementById('dash-body');
+  var keyer={country:function(t){return t.country;},site:function(t){return t.site;},project:function(t){return t.project;}}[DASH_BY];
+  // 현재 출장중만 집계 (기준값 비면 '(미지정)'으로 묶어 표시 → 수정 가능)
+  var groups={};
+  DATA.trips.forEach(function(t){
+    if(!t.name) return;
+    var raw=keyer(t);
+    var k=(raw==null||String(raw).trim()==='')?'(미지정)':String(raw);
+    if(!groups[k]) groups[k]={live:0,total:0,names:{}};
+    groups[k].total++;
+    if(isLive(t)){ groups[k].live++; groups[k].names[t.name]=1; }
+  });
+  var keys=Object.keys(groups).sort(function(a,b){
+    return groups[b].live-groups[a].live || (a<b?-1:1);
+  });
+  if(!keys.length){ box.innerHTML='<div class="bars"><div class="bars-empty">출장 기록이 없습니다. <b>출장등록</b>에서 추가하세요.</div></div>'; return; }
+  var maxLive=Math.max(1, keys[0]?groups[keys[0]].live:1);
+  var labelName={country:'국가',site:'출장사이트',project:'프로젝트'}[DASH_BY];
+  var totalLive=DATA.trips.filter(isLive).length;
+  // 드롭다운 (선택 시 해당 그룹 상세로 이동)
+  var ddOpts=keys.map(function(k){
+    var g=groups[k];
+    return '<option value="'+esc(k)+'">'+esc(k)+' ('+g.live+'명 출장중 / 총 '+g.total+'건)</option>';
+  }).join('');
+  var html='<div class="dash-dd"><select id="dash-jump" onchange="if(this.value)goGroup(\''+DASH_BY+'\',this.value)">'+
+    '<option value="">▼ '+labelName+' 선택해서 바로 보기</option>'+ddOpts+'</select></div>';
+  html+='<div class="bars">';
+  keys.forEach(function(k){
+    var g=groups[k], pct=Math.round(g.live/maxLive*100);
+    var peopleCnt=Object.keys(g.names).length;
+    var inside=g.live>0 && pct>=22;
+    var col=groupColor(DASH_BY,k);
+    var fillStyle=g.live? ('width:'+pct+'%;background:linear-gradient(90deg,'+col+'cc,'+col+')') : 'width:0%';
+    html+='<div class="bar-row" onclick=\'goGroup("'+DASH_BY+'",'+JSON.stringify(k)+')\'>'+
+      '<div class="bar-label" title="'+esc(k)+'"><i class="bar-key" style="background:'+col+'"></i>'+esc(k)+'</div>'+
+      '<div class="bar-track">'+
+        '<div class="bar-fill'+(g.live?'':' zero')+'" style="'+fillStyle+'">'+
+          (inside?'<span class="bar-val">'+g.live+'명</span>':'')+
+        '</div>'+
+        (!inside?'<span class="bar-val out" style="left:calc('+(g.live?pct:0)+'% + 6px)">'+g.live+'명</span>':'')+
+      '</div>'+
+      '<span class="bchev">›</span></div>';
+  });
+  html+='<div class="bars-foot">'+labelName+'별 현재 출장중 인원 · 총 '+totalLive+'명 출장중 · 막대를 누르면 상세</div></div>';
+  box.innerHTML=html;
+}
+function goGroup(by,key){ NAV={level:'group',by:by,key:key}; renderDash(); window.scrollTo(0,0); }
+function goWarnings(){ NAV={level:'warnings'}; renderDash(); window.scrollTo(0,0); }
+function goPerson(name){ NAV={level:'person',personName:name,from:JSON.parse(JSON.stringify(NAV))}; renderDash(); window.scrollTo(0,0); }
+function backDash(){ NAV={level:'list'}; renderDash(); }
+function backFromPerson(){ NAV=NAV.from||{level:'list'}; renderDash(); }
+
+function renderWarnings(){
+  var box=document.getElementById('dash-body');
+  var items=visaWarnings();
+  var html='<button class="back" onclick="backDash()">‹ 대시보드</button>';
+  html+='<div class="card" style="border-top:3px solid var(--over)"><h2><span class="dot" style="background:var(--over)"></span>⚠️ 비자 경고 인원 <span class="cnt">'+items.length+'건</span></h2>';
+  if(!items.length){
+    html+='<div class="empty">경고(임박·초과) 대상자가 없습니다.</div>';
+  }else{
+    html+='<div class="hint" style="margin-bottom:8px">최근 [기준기간]일 누적 체류일이 경고일수에 임박(80%↑) 또는 초과한 경우입니다. 이름을 누르면 상세로 이동합니다.</div>';
+    items.forEach(function(it){
+      var stTxt=it.status==='over'?'<span class="badge b-over">초과</span>':'<span class="badge b-warn">임박</span>';
+      var detail=it.status==='over'? (it.over+'일 초과') : ('한도까지 '+(it.warn-it.cum)+'일');
+      var fc=hashColor('country:'+it.country);
+      html+='<div class="stat s-'+it.status+'" onclick=\'goPerson('+JSON.stringify(it.name)+')\' style="cursor:pointer">'+
+        '<div><div class="ctry">'+esc(it.name)+' · '+esc(it.country)+(it.visa?' ('+esc(it.visa)+')':'')+stTxt+'</div>'+
+        '<div class="det">최근 '+it.window+'일 누적 '+it.cum+'일 / 경고 '+it.warn+'일 · '+detail+'</div></div>'+
+        '<div class="big"><div class="n" style="color:'+(it.status==='over'?'var(--over)':'var(--warn)')+'">'+it.cum+'</div><div class="u">/ '+it.warn+'일</div></div></div>';
+    });
+  }
+  html+='</div>';
+  box.innerHTML=html;
+}
+function renderGroupDetail(by,key){
+  var box=document.getElementById('dash-body');
+  var keyer={country:'country',site:'site',project:'project'}[by];
+  var here=DATA.trips.filter(function(t){return (t[keyer]||'(미지정)')===key;});
+  var liveOnes=here.filter(isLive), doneOnes=here.filter(function(t){return !isLive(t);});
+  var html='<button class="back" onclick="backDash()">‹ 대시보드</button>';
+  var gcol=groupColor(by,key);
+  html+='<div class="card" style="border-top:3px solid '+gcol+'"><h2><span class="dot" style="background:'+gcol+'"></span>'+esc(key)+' <span class="cnt">출장중 '+liveOnes.length+'명 / 총 '+here.length+'건</span></h2>';
+  if(liveOnes.length){
+    html+='<div class="hint" style="margin-bottom:8px;font-weight:700;color:var(--live)">● 현재 출장중</div>';
+    liveOnes.sort(function(a,b){return a.return<b.return?-1:1;}).forEach(function(t){ html+=tripRow(t,true,true); });
+  } else html+='<div class="empty">현재 출장중인 인원이 없습니다.</div>';
+  if(doneOnes.length){
+    html+='<div class="hint" style="margin:12px 0 8px;font-weight:700;color:var(--done)">완료 이력</div>';
+    doneOnes.sort(function(a,b){return b.depart<a.depart?-1:1;}).forEach(function(t){ html+=tripRow(t,true,true); });
+  }
+  html+='</div>';
+  box.innerHTML=html;
+}
+
+function renderPersonDetail(name){
+  var box=document.getElementById('dash-body');
+  var mine=DATA.trips.filter(function(t){return t.name===name;});
+  var person=DATA.persons.filter(function(p){return p.name===name;})[0]||{};
+  var html='<button class="back" onclick="backFromPerson()">‹ 뒤로</button>';
+  // 여권/발권 정보
+  html+='<div class="card"><h2><span class="dot"></span>'+esc(name)+
+    ' <span style="font-weight:500;font-size:11px;color:var(--soft)">'+esc(person.affiliation||'')+(person.company?' · '+esc(person.company):'')+'</span></h2>';
+  html+='<div class="ppinfo">'+
+    pr('영문명',person.engName)+pr('여권번호',pii(person.passport))+pr('생년월일',pii(person.birth))+pr('핸드폰',pii(person.phone))+'</div>';
+  // 국가별 누적
+  if(mine.length){
+    var byC={}; mine.forEach(function(t){ var k=t.country+(t.visa?' · '+t.visa:''); (byC[k]=byC[k]||{country:t.country,visa:t.visa||'',trips:[]}).trips.push(t); });
+    html+='<div class="hint" style="font-weight:700;margin-bottom:8px">국가·비자별 최근 누적 체류일</div>';
+    Object.keys(byC).sort().forEach(function(label){
+      var grp=byC[label], r=ruleFor(grp.country,grp.visa),cum=cumDays(grp.trips,r.window),st=statusOf(cum,r),remain=r.warn?r.warn-cum:null;
+      html+='<div class="stat s-'+st+'"><div><div class="ctry">'+esc(label)+badge(st)+'</div>'+
+        '<div class="det">출장 '+grp.trips.length+'건'+(r.warn?(remain>=0?' · 잔여 '+remain+'일':' · '+Math.abs(remain)+'일 초과'):'')+'</div></div>'+
+        '<div class="big"><div class="n">'+cum+'</div><div class="u">/ '+(r.warn||r.window)+'일</div></div></div>';
+    });
+  }
+  html+='</div>';
+  // 전체 이력
+  html+='<div class="card"><h2><span class="dot"></span>전체 출장 이력 <span class="cnt">'+mine.length+'건</span></h2>';
+  if(mine.length) mine.sort(function(a,b){return b.depart<a.depart?-1:1;}).forEach(function(t){ html+=tripRow(t,false,true); });
+  else html+='<div class="empty">출장 이력이 없습니다.</div>';
+  html+='</div>';
+  box.innerHTML=html;
+}
+function pr(k,v){ return '<div class="pr"><span>'+k+'</span><b>'+(v?esc(v):'—')+'</b></div>'; }
+
+function badge(st){
+  if(st==='over') return '<span class="badge b-over">초과</span>';
+  if(st==='warn') return '<span class="badge b-warn">임박</span>';
+  if(st==='ok') return '<span class="badge b-ok">여유</span>';
+  return '';
+}
+function tripRow(t,showName,clickPerson){
+  var st=isLive(t)?'<span class="badge b-live">출장중</span>':'<span class="badge b-done">완료</span>';
+  var onclick=clickPerson?(' onclick=\'goPerson('+JSON.stringify(t.name)+')\' style="cursor:pointer"'):'';
+  var fc=hashColor('country:'+t.country);
+  return '<div class="trip"'+onclick+'><div class="flag" style="background:'+fc+'22;color:'+fc+'">'+esc(flagTxt(t.country))+'</div>'+
+    '<div class="info"><div class="t1">'+(showName?esc(t.name)+' · ':'')+esc(t.country)+st+'</div>'+
+    '<div class="t2">'+esc(t.depart)+' → '+esc(t.return)+
+    (t.site?' · '+esc(t.site):'')+(t.project?' / '+esc(t.project):'')+'</div></div>'+
+    '<div class="dnum">'+t.days+'<span>일</span></div>'+
+    '<button class="x admin-only" onclick=\'event.stopPropagation();openEdit("'+t.id+'")\'>✎</button></div>';
+}
+
+/* ===== 출장 등록 ===== */
+function submitTrip(){
+  var pid=val('f-person');
+  if(!pid) return toast('출장자를 검색해서 선택하세요',true);
+  var person=DATA.persons.filter(function(p){return p.id===pid;})[0];
+  var site, country, city;
+  if(F_SITE_NEW){
+    site=val('f-site-new').trim();
+    if(!site) return toast('새 출장사이트명을 입력하세요',true);
+    country=val('f-country').trim(); city=val('f-city').trim();
+    if(!country) return toast('새 사이트의 국가를 입력하세요',true);
+  }else{
+    site=val('f-site');
+    if(!site) return toast('출장사이트를 선택하세요',true);
+    var info=siteInfo(site); country=info.country; city=info.city;
+    if(!country) return toast('이 사이트에 국가 정보가 없습니다. 출장사이트 탭에서 국가를 등록하세요',true);
+  }
+  var project=F_PROJ_NEW? val('f-project-new').trim() : val('f-project');
+  var visa=val('f-visa');
+  var dep=val('f-depart'),ret=val('f-return');
+  if(!dep||!ret) return toast('출국일·귀국일을 모두 입력하세요',true);
+  if(pd(ret)<pd(dep)) return toast('귀국일이 출국일보다 빠릅니다',true);
+  // 새 사이트면 마스터에도 등록
+  function doAdd(){
+    var payload={personId:pid,name:person.name,site:site,
+      project:project,country:country,city:city,visa:visa,depart:dep,return:ret,
+      status:'진행중',note:val('f-note').trim()};
+    run('addTrip',payload,function(){ toast('출장이 등록되었습니다'); clearTripForm(); });
+  }
+  var isNewSite=!allSites().some(function(s){return s===site;});
+  if(isNewSite){
+    run('saveMaster',{site:site,project:project,country:country,city:city},function(){ doAdd(); });
+  }else doAdd();
+}
+function clearTripForm(){ F_SITE_NEW=false; F_PROJ_NEW=false; ['f-person','f-site','f-site-new','f-project','f-project-new','f-country','f-city','f-visa','f-depart','f-return','f-note'].forEach(function(id){var e=document.getElementById(id); if(e) e.value='';}); document.getElementById('f-site-new').style.display='none'; document.getElementById('f-project-new').style.display='none'; document.getElementById('f-site').disabled=false; document.getElementById('f-project').disabled=false; var co=document.getElementById('f-country'),ci=document.getElementById('f-city'); co.setAttribute('readonly','readonly'); co.style.background='var(--line2)'; ci.setAttribute('readonly','readonly'); ci.style.background='var(--line2)'; document.querySelectorAll('#v-reg .newbtn').forEach(function(b){b.classList.remove('on');}); document.getElementById('f-selected').innerHTML=''; document.getElementById('f-results').innerHTML=''; var s=document.getElementById('f-search'); s.style.display=''; s.value=''; document.getElementById('f-days').textContent='체류일: 출국일·귀국일 입력 시 자동 계산 (양끝 포함)'; }
+
+/* ===== 출장자 명부 ===== */
+function submitPerson(){
+  var name=val('p-name').trim();
+  if(!name) return toast('이름을 입력하세요',true);
+  var payload={id:val('p-id'),name:name,affiliation:radio('paff'),company:val('p-company').trim(),
+    phone:val('p-phone').trim(),passport:val('p-passport').trim().toUpperCase(),engName:val('p-eng').trim().toUpperCase(),birth:val('p-birth')};
+  run('savePerson',payload,function(){ toast('명부에 저장되었습니다'); clearPersonForm(); });
+}
+function clearPersonForm(){ ['p-id','p-name','p-company','p-phone','p-passport','p-eng','p-birth'].forEach(function(id){document.getElementById(id).value='';}); document.querySelector('[name=paff][value=직원]').checked=true; }
+function editPerson(id){
+  var p=DATA.persons.filter(function(x){return x.id===id;})[0]; if(!p) return;
+  document.getElementById('p-id').value=p.id; document.getElementById('p-name').value=p.name;
+  document.getElementById('p-company').value=p.company; document.getElementById('p-phone').value=p.phone||'';
+  document.getElementById('p-passport').value=p.passport;
+  document.getElementById('p-eng').value=p.engName; document.getElementById('p-birth').value=p.birth;
+  document.querySelectorAll('[name=paff]').forEach(function(r){r.checked=(r.value===p.affiliation);});
+  document.querySelector('[data-v="person"]').click(); window.scrollTo(0,0);
+}
+function delPerson(id){
+  var p=DATA.persons.filter(function(x){return x.id===id;})[0];
+  var cnt=DATA.trips.filter(function(t){return t.personId===id;}).length;
+  if(!confirm(p.name+' 명부를 삭제할까요?'+(cnt?'\n(출장 기록 '+cnt+'건은 유지됩니다)':''))) return;
+  run('deletePerson',id,function(){ toast('삭제되었습니다'); });
+}
+function renderPersonList(){
+  var box=document.getElementById('person-list');
+  document.getElementById('person-cnt').textContent=DATA.persons.length+'명';
+  if(!DATA.persons.length){ box.innerHTML='<div class="empty">등록된 출장자가 없습니다.</div>'; return; }
+  var q=(document.getElementById('pl-search').value||'').trim().toLowerCase();
+  var list=DATA.persons.slice().sort(function(a,b){return a.name<b.name?-1:1;});
+  if(q){
+    list=list.filter(function(p){
+      return p.name.toLowerCase().indexOf(q)>=0
+        || (p.engName&&p.engName.toLowerCase().indexOf(q)>=0)
+        || (p.company&&p.company.toLowerCase().indexOf(q)>=0)
+        || (p.phone&&p.phone.indexOf(q)>=0);
+    });
+  }
+  if(!list.length){ box.innerHTML='<div class="empty">"'+esc(q)+'" 검색 결과가 없습니다.</div>'; return; }
+  box.innerHTML=list.map(function(p){
+    var live=DATA.trips.filter(function(t){return t.personId===p.id&&isLive(t);}).length;
+    return '<div class="trip"><div class="flag">'+esc(p.name.slice(0,1))+'</div>'+
+      '<div class="info" onclick=\'goPersonFromList('+JSON.stringify(p.name)+')\' style="cursor:pointer">'+
+      '<div class="t1">'+esc(p.name)+(live?' <span class="badge b-live">출장중</span>':'')+'</div>'+
+      '<div class="t2">'+esc(p.affiliation)+(p.company?' · '+esc(p.company):'')+(p.phone?' · '+esc(pii(p.phone)):'')+(p.passport?' · '+esc(pii(p.passport)):' · 여권미등록')+'</div></div>'+
+      '<button class="x admin-only" onclick=\'editPerson("'+p.id+'")\'>✎</button>'+
+      '<button class="x admin-only" onclick=\'delPerson("'+p.id+'")\'>🗑</button></div>';
+  }).join('');
+}
+function goPersonFromList(name){ document.querySelector('[data-v="dash"]').click(); goPerson(name); }
+
+/* ===== 보고서 ===== */
+var RP_FIELDS=[
+  {k:'name',label:'이름',def:true},
+  {k:'affiliation',label:'소속',def:true},
+  {k:'company',label:'회사명',def:false},
+  {k:'site',label:'출장사이트',def:true},
+  {k:'project',label:'프로젝트',def:true},
+  {k:'country',label:'국가',def:true},
+  {k:'visa',label:'비자',def:true},
+  {k:'city',label:'도시',def:false},
+  {k:'depart',label:'출국일',def:true},
+  {k:'return',label:'귀국일',def:true},
+  {k:'days',label:'체류일',def:true},
+  {k:'cum',label:'최근1년 누적',def:false},
+  {k:'status',label:'상태',def:true},
+  {k:'passport',label:'여권번호',def:false},
+  {k:'engName',label:'영문명',def:false},
+  {k:'birth',label:'생년월일',def:false},
+  {k:'phone',label:'핸드폰',def:false},
+  {k:'note',label:'비고',def:false}
+];
+function rpInit(){
+  // 체크박스 그리드
+  document.getElementById('rp-fields').innerHTML=RP_FIELDS.map(function(f){
+    return '<label><input type="checkbox" value="'+f.k+'"'+(f.def?' checked':'')+'>'+f.label+'</label>';
+  }).join('');
+  rpFillGroup();
+}
+function rpFillGroup(){
+  var by=radio('rpby');
+  var keys;
+  if(by==='site') keys=allSites();
+  else if(by==='country') keys=uniq(DATA.trips.map(function(t){return t.country;}).concat(DATA.master.map(function(m){return m.country;}))).filter(Boolean).sort();
+  else keys=uniq(DATA.trips.map(function(t){return t.project;}).concat(DATA.master.map(function(m){return m.project;}))).filter(Boolean).sort();
+  var label={site:'출장사이트',country:'국가',project:'프로젝트'}[by];
+  document.getElementById('rp-group').innerHTML='<option value="__ALL__">— 전체 ('+label+' 무관) —</option>'+
+    keys.map(function(k){return '<option>'+esc(k)+'</option>';}).join('');
+}
+function personById(id){ return DATA.persons.filter(function(p){return p.id===id;})[0]||{}; }
+function cumForTrip(t){
+  // 해당 출장자+국가+비자의 최근 누적
+  var r=ruleFor(t.country,t.visa);
+  var same=DATA.trips.filter(function(x){return x.name===t.name && x.country===t.country && (x.visa||'')===(t.visa||'');});
+  return cumDays(same,r.window);
+}
+function genReport(){
+  var by=radio('rpby'), group=val('rp-group'), stat=radio('rpstat');
+  var fields=Array.prototype.slice.call(document.querySelectorAll('#rp-fields input:checked')).map(function(c){return c.value;});
+  if(!fields.length) return toast('표시 항목을 1개 이상 선택하세요',true);
+  // 필터링
+  var keyer={site:'site',country:'country',project:'project'}[by];
+  var rows=DATA.trips.filter(function(t){
+    if(group!=='__ALL__' && (t[keyer]||'')!==group) return false;
+    if(stat==='live' && !isLive(t)) return false;
+    if(stat==='done' && isLive(t)) return false;
+    return true;
+  });
+  // 정렬: 이름 → 출국일
+  rows.sort(function(a,b){ return (a.name<b.name?-1:a.name>b.name?1:0) || (a.depart<b.depart?-1:1); });
+
+  var byLabel={site:'출장사이트',country:'국가',project:'프로젝트'}[by];
+  var statLabel={all:'전체',live:'출장중',done:'완료'}[stat];
+  var scope=(group==='__ALL__')?(byLabel+' 전체'):(byLabel+' : '+group);
+  var today=DATA.today;
+  var liveCnt=rows.filter(isLive).length, peopleCnt=uniq(rows.map(function(r){return r.name;})).length;
+
+  var out=document.getElementById('report-out');
+  if(!rows.length){
+    out.innerHTML='<div class="rp-actions no-print"><button class="rp-back" onclick="clearReport()">‹ 다시 설정</button></div>'+
+      '<div class="report"><div class="rp-empty">조건에 맞는 출장 기록이 없습니다.</div></div>';
+    out.scrollIntoView({behavior:'smooth'});
+    return;
+  }
+  // 헤더
+  var ths=fields.map(function(k){ var f=RP_FIELDS.filter(function(x){return x.k===k;})[0]; return '<th>'+esc(f.label)+'</th>'; }).join('');
+  // 행
+  var trs=rows.map(function(t){
+    var p=t.personId?personById(t.personId):{};
+    var tds=fields.map(function(k){
+      var v='';
+      if(k==='name') v=t.name;
+      else if(k==='affiliation') v=p.affiliation||'';
+      else if(k==='company') v=p.company||'';
+      else if(k==='site') v=t.site||'';
+      else if(k==='project') v=t.project||'';
+      else if(k==='country') v=t.country||'';
+      else if(k==='city') v=t.city||'';
+      else if(k==='depart') v=t.depart||'';
+      else if(k==='return') v=t.return||'';
+      else if(k==='days') v=t.days+'일';
+      else if(k==='visa') v=t.visa||'';
+      else if(k==='cum'){ var c=cumForTrip(t),r=ruleFor(t.country,t.visa),st=statusOf(c,r); return '<td class="'+(st==='over'?'rp-over':st==='warn'?'rp-warn':'')+'">'+c+'일'+(r.warn?' / '+r.warn:'')+'</td>'; }
+      else if(k==='status') v=isLive(t)?'출장중':'완료';
+      else if(k==='passport') v=pii(p.passport);
+      else if(k==='engName') v=p.engName||'';
+      else if(k==='birth') v=pii(p.birth);
+      else if(k==='phone') v=pii(p.phone);
+      else if(k==='note') v=t.note||'';
+      return '<td>'+esc(v)+'</td>';
+    }).join('');
+    return '<tr>'+tds+'</tr>';
+  }).join('');
+
+  var html='<div class="rp-actions no-print">'+
+    '<button class="rp-back" onclick="clearReport()">‹ 다시 설정</button>'+
+    '<button class="rp-print" onclick="window.print()">🖨️ 인쇄 / PDF 저장</button></div>'+
+    '<div class="report" id="report-doc">'+
+    '<div class="rp-head"><div><div class="rp-title">해외 출장자 보고서</div>'+
+    '<div class="rp-meta">범위: '+esc(scope)+' &nbsp;|&nbsp; 상태: '+statLabel+'<br>출력일: '+today+'</div></div>'+
+    '<div class="rp-logo">주식회사 이티에스<br><span style="font-weight:500;color:var(--soft)">ETS</span></div></div>'+
+    '<div class="rp-summary"><div class="rp-sum"><b>'+rows.length+'</b>건</div>'+
+    '<div class="rp-sum"><b>'+peopleCnt+'</b>명</div>'+
+    '<div class="rp-sum"><b>'+liveCnt+'</b>명 출장중</div></div>'+
+    '<table class="rp-table"><thead><tr>'+ths+'</tr></thead><tbody>'+trs+'</tbody></table>'+
+    '<div class="rp-foot">본 보고서는 출장자 관리 시스템에서 '+today+' 자동 생성되었습니다. · 비자 누적일은 국가별 단순 누적 기준이며 실제 비자 한도와 다를 수 있습니다.</div>'+
+    '</div>';
+  out.innerHTML=html;
+  out.scrollIntoView({behavior:'smooth'});
+}
+function clearReport(){ document.getElementById('report-out').innerHTML=''; window.scrollTo(0,0); }
+
+/* ===== 전체 출장기록 목록 ===== */
+function renderRecords(){
+  var box=document.getElementById('records-list');
+  var q=(document.getElementById('rec-search').value||'').trim().toLowerCase();
+  var statf=val('rec-status'), sortf=val('rec-sort');
+  var rows=DATA.trips.slice();
+  // 검색
+  if(q){
+    rows=rows.filter(function(t){
+      return (t.name&&t.name.toLowerCase().indexOf(q)>=0)
+        || (t.site&&t.site.toLowerCase().indexOf(q)>=0)
+        || (t.country&&t.country.toLowerCase().indexOf(q)>=0)
+        || (t.project&&t.project.toLowerCase().indexOf(q)>=0)
+        || (t.visa&&t.visa.toLowerCase().indexOf(q)>=0);
+    });
+  }
+  // 상태 필터
+  if(statf==='live') rows=rows.filter(isLive);
+  else if(statf==='done') rows=rows.filter(function(t){return !isLive(t);});
+  // 정렬
+  rows.sort(function(a,b){
+    if(sortf==='name') return (a.name<b.name?-1:a.name>b.name?1:0) || (a.depart<b.depart?1:-1);
+    if(sortf==='depart_asc') return a.depart<b.depart?-1:1;
+    if(sortf==='return_asc') return a.return<b.return?-1:1;
+    return a.depart<b.depart?1:-1; // depart_desc 기본
+  });
+  document.getElementById('rec-cnt').textContent=rows.length+'건'+(DATA.trips.length!==rows.length?(' / 전체 '+DATA.trips.length):'');
+  if(!DATA.trips.length){ box.innerHTML='<div class="rec-empty">출장기록이 없습니다.</div>'; return; }
+  if(!rows.length){ box.innerHTML='<div class="rec-empty">검색·필터 결과가 없습니다.</div>'; return; }
+  box.innerHTML=rows.map(function(t){
+    var fc=hashColor('country:'+t.country);
+    var st=isLive(t)?'<span class="badge b-live">출장중</span>':'<span class="badge b-done">완료</span>';
+    var loc=[t.site,t.project].filter(Boolean).join(' / ');
+    return '<div class="rec"><div class="rflag" style="background:'+fc+'22;color:'+fc+'">'+esc(flagTxt(t.country))+'</div>'+
+      '<div class="rinfo">'+
+      '<div class="r1">'+esc(t.name)+' <span style="color:var(--soft);font-weight:500">'+esc(t.country)+(t.visa?' · '+esc(t.visa):'')+'</span>'+st+'</div>'+
+      '<div class="r2">'+esc(t.depart)+' → '+esc(t.return)+(loc?' · '+esc(loc):'')+'</div></div>'+
+      '<div class="rdays">'+t.days+'<span>일</span></div>'+
+      '<button class="redit admin-only" onclick=\'openEdit("'+t.id+'")\'>✎</button></div>';
+  }).join('');
+}
+
+/* ===== 현장 마스터 ===== */
+function submitMaster(){
+  var site = M_SITE_NEW ? val('m-site').trim() : val('m-site-sel');
+  if(!site) return toast('출장사이트를 선택하거나 새로 작성하세요',true);
+  var country=val('m-country').trim();
+  if(!country) return toast('국가를 입력하세요 (지도 표시·국가별 집계에 필요)',true);
+  var payload={site:site,project:val('m-project').trim(),country:country,city:val('m-city').trim()};
+  run('saveMaster',payload,function(){
+    toast('출장사이트가 추가되었습니다');
+    document.getElementById('m-project').value='';
+    // 새로작성 모드였으면 방금 만든 사이트를 선택 상태로 전환
+    if(M_SITE_NEW){ mSiteNew(true); document.getElementById('m-site-sel').value=site; }
+  });
+}
+function delMaster(site,proj){
+  if(!confirm('이 항목을 삭제할까요?')) return;
+  run('deleteMaster',{site:site,project:proj},function(){ toast('삭제되었습니다'); });
+}
+function renderMasterList(){
+  var box=document.getElementById('master-list');
+  document.getElementById('master-cnt').textContent=DATA.master.length+'개';
+  if(!DATA.master.length){ box.innerHTML='<div class="empty">등록된 출장사이트가 없습니다.</div>'; return; }
+  var bySite={};
+  DATA.master.forEach(function(m){ (bySite[m.site]=bySite[m.site]||[]).push(m); });
+  box.innerHTML=Object.keys(bySite).sort().map(function(site){
+    var col=hashColor('cust:'+site), loc=bySite[site][0];
+    var locTxt=[loc.country,loc.city].filter(Boolean).join(' · ');
+    return '<div style="margin-bottom:12px"><div style="font-weight:800;font-size:15px;margin-bottom:6px;display:flex;align-items:center;gap:6px">'+
+      '<i style="width:9px;height:9px;border-radius:2px;background:'+col+';display:inline-block"></i>'+esc(site)+
+      (locTxt?' <span style="font-weight:500;font-size:11px;color:var(--soft)">'+esc(locTxt)+'</span>':'')+'</div>'+
+      bySite[site].map(function(m){
+        return '<div class="mrow"><div class="mt"><b>'+esc(m.project||'(프로젝트 미지정)')+'</b></div>'+
+          '<button class="x" onclick=\'delMaster('+JSON.stringify(m.site)+','+JSON.stringify(m.project)+')\'>🗑</button></div>';
+      }).join('')+'</div>';
+  }).join('');
+}
+
+/* ===== 비자 기준 ===== */
+function submitRule(){
+  var c=val('r-country').trim(), visa=val('r-visa').trim();
+  if(!c) return toast('국가를 입력하세요',true);
+  if(!visa) return toast('비자명을 입력하세요',true);
+  run('saveRule',{country:c,visa:visa,window:+val('r-window')||365,warn:+val('r-warn')||0,memo:val('r-memo').trim()},
+    function(){ toast('저장되었습니다'); document.getElementById('r-visa').value=''; document.getElementById('r-memo').value=''; });
+}
+function editRule(country,visa){
+  var r=ruleFor(country,visa);
+  document.getElementById('r-country').value=r.country; document.getElementById('r-visa').value=r.visa;
+  document.getElementById('r-window').value=r.window;
+  document.getElementById('r-warn').value=r.warn; document.getElementById('r-memo').value=r.memo;
+  window.scrollTo(0,document.body.scrollHeight);
+}
+function delRule(country,visa){
+  if(!confirm(country+' · '+visa+' 기준을 삭제할까요?')) return;
+  run('deleteRule',{country:country,visa:visa},function(){ toast('삭제되었습니다'); });
+}
+function renderRules(){
+  var box=document.getElementById('rules-body');
+  // 국가 datalist 갱신
+  opt('dl-rcountry', uniq(DATA.rules.map(function(r){return r.country;})).sort());
+  if(!DATA.rules.length){ box.innerHTML='<div class="empty">등록된 비자 기준이 없습니다.</div>'; return; }
+  // 국가별로 그룹핑
+  var byCountry={};
+  DATA.rules.forEach(function(r){ (byCountry[r.country]=byCountry[r.country]||[]).push(r); });
+  box.innerHTML=Object.keys(byCountry).sort().map(function(country){
+    var col=hashColor('country:'+country);
+    return '<div style="margin-bottom:12px"><div style="font-weight:800;font-size:15px;margin-bottom:6px;display:flex;align-items:center;gap:6px">'+
+      '<i style="width:9px;height:9px;border-radius:2px;background:'+col+';display:inline-block"></i>'+esc(country)+'</div>'+
+      byCountry[country].map(function(r){
+        return '<div class="rule" style="margin-bottom:7px"><div class="rh"><b style="font-size:14px">'+esc(r.visa||'(비자명 없음)')+'</b>'+
+          '<span><button class="x" onclick=\'editRule('+JSON.stringify(r.country)+','+JSON.stringify(r.visa)+')\'>✎</button>'+
+          '<button class="x" onclick=\'delRule('+JSON.stringify(r.country)+','+JSON.stringify(r.visa)+')\'>🗑</button></span></div>'+
+          '<div class="rg"><div><span class="hint">기준기간</span><br><b>'+r.window+'일</b></div>'+
+          '<div><span class="hint">경고(한도)</span><br><b>'+(r.warn||'-')+'일</b></div></div>'+
+          (r.memo?'<div class="memo">'+esc(r.memo)+'</div>':'')+'</div>';
+      }).join('')+'</div>';
+  }).join('');
+}
+
+/* ===== 출장기록 수정 모달 ===== */
+function openEdit(id){
+  var t=DATA.trips.filter(function(x){return x.id===id;})[0]; if(!t) return;
+  document.getElementById('e-id').value=t.id; document.getElementById('e-personId').value=t.personId;
+  document.getElementById('e-name').value=t.name;
+  fillSiteSelect();
+  document.getElementById('e-site').value=t.site;
+  fillProjectSelect('e-project',t.site,t.project);
+  document.getElementById('e-country').value=t.country;
+  document.getElementById('e-city').value=t.city||'';
+  fillVisaSelect('e-visa',t.country,t.visa||'');
+  document.getElementById('e-depart').value=t.depart;
+  document.getElementById('e-return').value=t.return; document.getElementById('e-note').value=t.note;
+  document.querySelectorAll('[name=estatus]').forEach(function(r){r.checked=(r.value===t.status);});
+  openM('modal-trip');
+}
+function onEditSiteChange(){
+  var site=val('e-site'), info=siteInfo(site);
+  document.getElementById('e-country').value=info.country;
+  document.getElementById('e-city').value=info.city;
+  fillProjectSelect('e-project',site,'');
+  fillVisaSelect('e-visa',info.country,'');
+}
+function submitEdit(){
+  var site=val('e-site');
+  if(!site) return toast('출장사이트를 선택하세요',true);
+  var dep=val('e-depart'),ret=val('e-return');
+  if(!dep||!ret) return toast('출국일·귀국일을 모두 입력하세요',true);
+  if(pd(ret)<pd(dep)) return toast('귀국일이 출국일보다 빠릅니다',true);
+  var info=siteInfo(site);
+  var payload={id:val('e-id'),personId:val('e-personId'),name:val('e-name'),
+    site:site,project:val('e-project'),country:info.country,city:info.city,visa:val('e-visa'),
+    depart:dep,return:ret,status:radio('estatus'),note:val('e-note').trim()};
+  run('updateTrip',payload,function(){ toast('수정되었습니다'); closeM('modal-trip'); });
+}
+function delTrip(){
+  if(!confirm('이 출장 기록을 삭제할까요?')) return;
+  run('deleteTrip',val('e-id'),function(){ toast('삭제되었습니다'); closeM('modal-trip'); });
+}
+
+/* ===== 귀국 완료 팝업 ===== */
+function checkReturns(){
+  var td=todayD();
+  retQueue=DATA.trips.filter(function(t){ return isLive(t)&&pd(t.return)&&pd(t.return)<td; });
+  retIdx=0;
+  if(retQueue.length) showReturn();
+}
+function showReturn(){
+  if(retIdx>=retQueue.length){ closeM('modal-return'); return; }
+  var t=retQueue[retIdx];
+  document.getElementById('ret-desc').innerHTML='<b>'+esc(t.name)+'</b> 님의 <b>'+esc(t.country)+'</b> 출장 귀국일('+esc(t.return)+')이 지났습니다. 귀국 완료로 변경할까요?'+
+    (retQueue.length>1?'<br><span style="color:var(--soft)">('+(retIdx+1)+'/'+retQueue.length+')</span>':'');
+  openM('modal-return');
+}
+function confirmReturn(){
+  var t=retQueue[retIdx];
+  run('setTripStatus',{id:t.id,status:'완료'},function(){ retIdx++; if(retIdx<retQueue.length) showReturn(); else closeM('modal-return'); });
+}
+function skipReturn(){ retIdx++; if(retIdx<retQueue.length) showReturn(); else closeM('modal-return'); }
+
+/* 공통 */
+/* Apps Script API 호출 (text/plain으로 CORS preflight 회피) */
+function apiCall(action,arg,onOk,onErr){
+  var body={action:action};
+  if(action==='deleteTrip'||action==='deletePerson'){ body.id=arg; }
+  else if(arg!=null){ body.payload=arg; }
+  fetch(API_URL,{
+    method:'POST',
+    headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body:JSON.stringify(body)
+  }).then(function(r){ return r.json(); })
+    .then(function(res){
+      if(res&&res.ok){ onOk&&onOk(res.data); }
+      else { onErr&&onErr((res&&res.error)||'오류'); }
+    })
+    .catch(function(e){ onErr&&onErr(e.message||'네트워크 오류'); });
+}
+function run(method,payload,ok){
+  document.getElementById('load').classList.remove('hide');
+  if(!GAS){ localMock(method,payload); document.getElementById('load').classList.add('hide'); render(); ok&&ok(); return; }
+  apiCall(method,payload,function(data){
+    DATA=data; document.getElementById('load').classList.add('hide'); render(); ok&&ok();
+  },function(msg){
+    document.getElementById('load').classList.add('hide'); toast(msg||'오류',true);
+  });
+}
+function openM(id){ document.getElementById(id).classList.add('show'); }
+function closeM(id){ document.getElementById(id).classList.remove('show'); }
+function toast(m,err){ var t=document.getElementById('toast'); t.textContent=m; t.className=err?'err show':'show'; setTimeout(function(){t.className='';},2400); }
+
+function updPreview(){
+  var d=pd(val('f-depart')),r=pd(val('f-return')),el=document.getElementById('f-days');
+  if(d&&r&&r>=d) el.innerHTML='체류일: <b style="color:var(--navy)">'+incl(d,r)+'일</b> (양끝 포함)';
+  else el.textContent='체류일: 출국일·귀국일 입력 시 자동 계산 (양끝 포함)';
+}
+
+/* 이벤트 */
+document.querySelectorAll('nav button').forEach(function(b){
+  b.onclick=function(){
+    document.querySelectorAll('nav button').forEach(function(x){x.classList.remove('active');});
+    document.querySelectorAll('.view').forEach(function(x){x.classList.remove('active');});
+    b.classList.add('active'); document.getElementById('v-'+b.dataset.v).classList.add('active');
+    if(b.dataset.v==='dash'){ renderDash(); if(LMAP) setTimeout(function(){LMAP.invalidateSize();},100); }
+    if(b.dataset.v==='records'){ renderRecords(); }
+  };
+});
+document.querySelectorAll('.dash-seg button').forEach(function(b){
+  b.onclick=function(){
+    document.querySelectorAll('.dash-seg button').forEach(function(x){x.classList.remove('on');});
+    b.classList.add('on'); DASH_BY=b.dataset.by; NAV={level:'list'}; renderDash();
+  };
+});
+document.getElementById('f-depart').onchange=updPreview;
+document.getElementById('f-return').onchange=updPreview;
+document.getElementById('f-search').oninput=searchPersons;
+document.getElementById('pl-search').oninput=renderPersonList;
+document.getElementById('rec-search').oninput=renderRecords;
+/* 핸드폰 자동 하이픈 포맷 */
+function fmtPhone(v){
+  var d=String(v).replace(/[^0-9]/g,'').slice(0,11);
+  if(d.startsWith('02')){ // 서울 02
+    if(d.length<3) return d;
+    if(d.length<6) return d.slice(0,2)+'-'+d.slice(2);
+    if(d.length<10) return d.slice(0,2)+'-'+d.slice(2,5)+'-'+d.slice(5);
+    return d.slice(0,2)+'-'+d.slice(2,6)+'-'+d.slice(6,10);
+  }
+  // 010, 011, 070, 지역번호(3자리) 등
+  if(d.length<4) return d;
+  if(d.length<7) return d.slice(0,3)+'-'+d.slice(3);
+  if(d.length<11) return d.slice(0,3)+'-'+d.slice(3,6)+'-'+d.slice(6);
+  return d.slice(0,3)+'-'+d.slice(3,7)+'-'+d.slice(7);
+}
+document.getElementById('p-phone').addEventListener('input',function(e){
+  var pos=this.selectionStart, before=this.value;
+  this.value=fmtPhone(this.value);
+  // 끝에서 입력 중이면 커서 끝으로, 아니면 길이 변화만큼 보정
+  if(pos>=before.length){ this.selectionStart=this.selectionEnd=this.value.length; }
+});
+document.getElementById('f-site').onchange=onSiteChange;
+document.getElementById('f-country').addEventListener('input',onFCountryInput);
+document.getElementById('e-site').onchange=onEditSiteChange;
+document.querySelectorAll('.modal').forEach(function(m){ m.onclick=function(e){ if(e.target===m && m.id!=='modal-return') closeM(m.id); }; });
+
+/* mock (로컬 미리보기 전용) */
+function mockData(){
+  var td=new Date();
+  DATA={today:fmt(td),
+    persons:[],
+    master:[],
+    rules:[
+      {country:'미국',visa:'ESTA',window:365,warn:90,memo:'무비자 방문, 1회 최대 90일'},
+      {country:'미국',visa:'B1/B2',window:365,warn:180,memo:'상용/방문 비자, 비자 명시 기간 확인'},
+      {country:'중국',visa:'무비자',window:365,warn:90,memo:'무비자 정책 변동 잦음'},
+      {country:'중국',visa:'M비자',window:365,warn:90,memo:'상용 비자'},
+      {country:'폴란드',visa:'셰겐',window:180,warn:90,memo:'셰겐 권역(유럽 합산)이나 국가별 단순 누적'},
+      {country:'인도네시아',visa:'VOA',window:365,warn:60,memo:'도착비자 30일(연장가능)'},
+      {country:'캐나다',visa:'eTA',window:365,warn:180,memo:'전자여행허가 최대 6개월'}],
+    trips:[]};
+}
+function localMock(m,p){
+  var P=(typeof p==='string')?JSON.parse(p):p;
+  if(m==='addTrip'){ P.id='L'+Date.now(); P.days=incl(pd(P.depart),pd(P.return)); DATA.trips.push(P); }
+  if(m==='updateTrip'){ DATA.trips=DATA.trips.map(function(t){return t.id===P.id?(P.days=incl(pd(P.depart),pd(P.return)),P):t;}); }
+  if(m==='setTripStatus'){ DATA.trips=DATA.trips.map(function(t){return t.id===P.id?(t.status=P.status,t):t;}); }
+  if(m==='deleteTrip'){ DATA.trips=DATA.trips.filter(function(t){return t.id!==P;}); }
+  if(m==='savePerson'){ if(P.id){DATA.persons=DATA.persons.map(function(x){return x.id===P.id?P:x;});} else {P.id='LP'+Date.now();DATA.persons.push(P);} }
+  if(m==='deletePerson'){ DATA.persons=DATA.persons.filter(function(x){return x.id!==P;}); }
+  if(m==='saveMaster'){ DATA.master.push(P); }
+  if(m==='deleteMaster'){ DATA.master=DATA.master.filter(function(x){return !(x.site===P.site&&x.project===P.project);}); }
+  if(m==='saveRule'){ var f=false; DATA.rules=DATA.rules.map(function(r){if(r.country===P.country&&r.visa===P.visa){f=true;return P;}return r;}); if(!f)DATA.rules.push(P); }
+  if(m==='deleteRule'){ DATA.rules=DATA.rules.filter(function(r){return !(r.country===P.country&&r.visa===P.visa);}); }
+}
+
+/* 스플래시 (CSS 애니메이션 로딩화면) */
+function hideSplash(){
+  var sp=document.getElementById('splash');
+  if(sp) sp.classList.add('hide');
+}
+
+applyAdminUI();
+load();
+// 로드 완료 후 스플래시 종료 (최소 1.4초 노출)
+setTimeout(hideSplash,1600);
+</script>
+</body>
+</html>
